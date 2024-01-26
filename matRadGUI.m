@@ -194,7 +194,7 @@ end
 %% 
 % handles.State=0   no data available
 % handles.State=1   ct cst and pln available; ready for dose calculation
-% handles.State=2   ct cst and pln available and dij matric(s) are calculated;
+% handles.State=2   ct cst and pln available and matric(s) are calculated;
 %                   ready for optimization
 % handles.State=3   plan is optimized
 
@@ -319,6 +319,9 @@ if handles.State == 2 || handles.State == 3
     set(handles.popupDisplayOption,'String','physicalDose');
     handles.SelectedDisplayOption ='physicalDose';
     handles.SelectedDisplayOptionIdx=1;
+    %set(handles.popupDisplayOption,'String','mClusterDose');
+    %handles.SelectedDisplayOption ='clusterDose';
+    %handles.SelectedDisplayOptionIdx=1;
 else
     handles.resultGUI = [];
     set(handles.popupDisplayOption,'String','no option available');
@@ -383,7 +386,7 @@ handles.rememberCurrAxes = true;
 guidata(hObject, handles);  
 % eof reloadGUI
 
-% --- Executes just before matRadGUI is made visible.
+% --- Executes just before matRadGUI is made visible.cst
 function matRadGUI_OpeningFcn(hObject, ~, handles, varargin) 
 %#ok<*DEFNU> 
 %#ok<*AGROW>
@@ -926,7 +929,7 @@ axes(handles.axesFig);
 % top of each other in matlab <2014
 drawnow;
 
-defaultFontSize = 8;
+defaultFontSize = 18;
 currAxes            = axis(handles.axesFig);
 AxesHandlesCT_Dose  = gobjects(0);
 AxesHandlesVOI      = cell(0);
@@ -972,6 +975,8 @@ if exist('Result','var')
                     DispInfo{i,3} = '[Gy(RBE)]';
                 elseif strfind(DispInfo{i,1},'LET')
                     DispInfo{i,3} = '[keV/um]';
+                elseif strfind(DispInfo{i,1}, 'clusterDose')
+                    DispInfo{i,3} = '[10^{18} ionizations / kg]';
                 else
                     DispInfo{i,3} = '[a.u.]';
                 end
@@ -1267,7 +1272,7 @@ if get(handles.popupTypeOfPlot,'Value') == 2 && exist('Result','var')
         set(PlotHandles{Cnt+1,1},'Linewidth',3,'color','b');
         set(ax(1),'ycolor','r')
         set(ax(2),'ycolor','b')
-        set(ax,'FontSize',8);
+        set(ax,'FontSize',18);
         Cnt=Cnt+2;
     end
        
@@ -1311,7 +1316,7 @@ if get(handles.popupTypeOfPlot,'Value') == 2 && exist('Result','var')
    Labels = PlotHandles(~cellfun(@isempty,PlotHandles(:,1)),2);
    h=legend(handles.axesFig,[Lines{:}],Labels{:});
    set(h,'FontSize',defaultFontSize);
-   xlabel('radiological depth [mm]','FontSize',8);  
+   xlabel('radiological depth [mm]','FontSize',18);  
    grid on, grid minor
    
 end
@@ -1393,7 +1398,7 @@ cla(axesFig3D);
 
 plane = get(handles.popupPlane,'Value');
 slice = round(get(handles.sliderSlice,'Value'));
-defaultFontSize = 8;
+defaultFontSize = 18;
 
 %Check if we need to precompute the surface data
 if size(cst,2) < 8
@@ -4025,14 +4030,47 @@ for i = 1:size(cst,1)
            obj = cst{i,6}{j};
            
            %Convert to class if not
-           if ~isa(obj,'matRad_DoseOptimizationFunction')
+           %if ~isa(obj,'matRad_DoseOptimizationFunction')
+           if isstruct(obj)
+           if strncmp(obj.className,'DoseObjective',13) || strncmp(obj.className,'DoseConstraint',14)
                 try
                     obj = matRad_DoseOptimizationFunction.createInstanceFromStruct(obj);
                 catch ME
                     warning('Objective/Constraint not valid!\n%s',ME.message)
                     continue;
                 end
+           elseif strncmp(obj.className,'ClusterDoseObjective',20)
+               try
+                    obj = matRad_ClusterDoseOptimizationFunction.createInstanceFromStruct(obj);
+               catch ME
+                    warning('Objective/Constraint not valid!\n%s',ME.message)
+                    continue;
+               end
            end
+           end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%{
+if isstruct(obj)
+            if strncmp(obj.className,'DoseObjective',13) || strncmp(obj.className,'DoseConstraint',14)
+                try
+                    obj = matRad_DoseOptimizationFunction.createInstanceFromStruct(obj);
+                catch
+                    matRad_cfg.dispError('cst{%d,6}{%d} is not a valid Objective/constraint! Remove or Replace and try again!',i,j);
+                end
+            elseif strncmp(obj.className,'ClusterDoseObjective',20)
+                try
+                    obj = matRad_ClusterDoseOptimizationFunction.createInstanceFromStruct(obj);
+                catch
+                    matRad_cfg.dispError('cst{%d,6}{%d} is not a valid Objective/constraint! Remove or Replace and try again!',i,j);
+                end
+                %obj.setClusterDose
+            else 
+                %error message, or check implementation on branch research/DADR
+            end
+        end
+%}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
            %VOI
            xPos = 0.01;%5;

@@ -34,6 +34,13 @@ function f = matRad_objectiveFunction(optiProb,w,dij,cst)
 optiProb.BP = optiProb.BP.compute(dij,w);
 d = optiProb.BP.GetResult();
 
+%Cluster Dose
+if ~isempty(optiProb.BP_clusterDose)
+    optiProb.BP_clusterDose = optiProb.BP_clusterDose.compute(dij,w);
+    clusterDose = optiProb.BP_clusterDose.GetResult();
+end
+
+
 
 % Initialize f
 f = 0;
@@ -73,6 +80,11 @@ for  i = 1:size(cst,1)
                     
                 %end
             
+            end
+            if isa(objective,'ClusterDoseObjectives.matRad_ClusterDoseObjective')
+                cd_i = clusterDose{1}(cst{i,4}{1});
+
+                f = f + objective.computeClusterDoseObjectiveFunction(cd_i);
             end
        
         end

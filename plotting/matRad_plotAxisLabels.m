@@ -47,8 +47,8 @@ if  plane == 3% Axial plane
         set(axesHandle,'YTick',0:tickdist/ct.resolution.y:1000);
         set(axesHandle,'XTickLabel',0:tickdist:1000*ct.resolution.x);
         set(axesHandle,'YTickLabel',0:tickdist:1000*ct.resolution.y);   
-        xlabel(axesHandle,'x [mm]','FontSize',defaultFontSize)
-        ylabel(axesHandle,'y [mm]','FontSize',defaultFontSize)
+        xlabel(axesHandle,'x [mm]','FontSize',defaultFontSize, 'Interpreter','latex')
+        ylabel(axesHandle,'y [mm]','FontSize',defaultFontSize, 'Interpreter','latex')
         title(axesHandle,['axial plane z = ' num2str(ct.resolution.z*slice) ' [mm]'],'FontSize',defaultFontSize)
     else
         xlabel(axesHandle,'x [voxels]','FontSize',defaultFontSize)

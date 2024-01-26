@@ -1,4 +1,4 @@
-classdef matRad_DoseEngineParticlePB < DoseEngines.matRad_DoseEnginePencilBeam
+classdef matRad_DoseEngineAnalytical < DoseEngines.matRad_DoseEnginePencilBeam
 % matRad_DoseEngineParticlePB: 
 %   Implements an engine for particle based dose calculation 
 %   For detailed information see superclass matRad_DoseEngine
@@ -20,36 +20,64 @@ classdef matRad_DoseEngineParticlePB < DoseEngines.matRad_DoseEnginePencilBeam
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
     properties (Constant)
-           possibleRadiationModes = {'protons', 'carbon', 'helium'}
-           name = 'Particle Pencil-Beam';
+           possibleRadiationModes = {'protons'}
+           name = 'Analytical Bragg Peak';
+
+           
+
     end
     
     properties (SetAccess = public, GetAccess = public)
             
         calcLET = true;                 % Boolean which defines if LET should be calculated
         calcBioDose = false;            % Boolean which defines if calculation should account for bio optimization
-        calcClusterDose = true;         % Boolean which defines if Cluster Dose should be calculated
-        clusterDoseIP = 'N4';           % IP name to compute
-        clusterDoseCalcMode = true;     % Boolean to compute cluster dose or not
-        clusterDoseFromFluence = false; % Boolean to compute cluster dose from fluence or direct interpolation
-
+        
+        %calcBortfeldBragg = true;
+        modeWidth = true;               % Boolean which defines a monoenergetic (0) and gaussian (1) energy spectrum
+        %modeParabCyl = true;           % Boolean which defines a handmade, slower (0) and matLab, faster (1) parabolic cylinder function
+        
         pbCalcMode;                     % fine sampling mode
         fineSampling;                   % Struct with finesampling properties
         
         visBoolLateralCutOff = false;   % Boolean switch for visualization during+ LeteralCutOff calculation
+    
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+           % Constants of the model
+           % PHYSICAL CONSTANTS
+           epsilon0         = 8.854*10^(-12);                   % Vacuum dielectric constant in (C^2/(N*m^2))
+           electronCharge   = 1.602*10^(-19);                   % Electron charge in (C)
+           avogadroNum      = 6.022*10^23;                      % Avogadro number
+
+           % PARAMETERS OF THE TARGET MATERIAL
+           massDensity = 0.997;                            % Mass Density of the medium in (g/cm^3)
+           p           = 1.77;                             % Exponent in the Bragg-Kleemann rule
+           alpha       = 2.2*10^(-3);                      % Material-dependent constant in the Bragg-Kleemann rule
+           beta        = 0.012;                            % Slope parameter of the linear fluence reduction
+           gammaNuc   = 0.6;                              % Fraction of locally absorbed energy in nuclear interactions
+
+           Z           = 10;                               % N of electrons per molecule (water)
+           MM          = 18.01;                            % Molar mass in g/mol (water)
+           %n           = DoseEngines.matRad_DoseEngineAnalyticalBragg.ro*DoseEngines.matRad_DoseEngineAnalyticalBragg.NA/DoseEngines.matRad_DoseEngineAnalyticalBragg.MM;                         % Number density of molecules per cm^3
+           %alpha1      = matRad_DoseEngine.el^2*matRad_DoseEngine.n*matRad_DoseEngine.Z/(4*pi*matRad_DoseEngine.epsilon0^2)/10^8;  % Bohr's formula for d(sigmaE)^2/dz
+
+           % PARAMETERS OF THE BEAM
+           phi0         = 1;                                % Primary proton fluence
+           epsilonTail  = 0.1;                              % (Small) fraction of primary fluence \phi_0 contributing to the linear "tail" of the energy spectrum
+           sigmaEnergy  = 0.01;                             % sigma of the gaussian energy spectrum
+
+           radLenght    = 36.3;
+    
     end
     
     properties (SetAccess = protected, GetAccess = public)        
         letDoseTmpContainer;            % temporary dose LET container
         alphaDoseTmpContainer;          % temporary dose alpha dose container
         betaDoseTmpContainer;           % temporary dose beta dose container        
-    
-        clusterDoseTmpContainer;        % temporary cluster dose container
     end
              
     methods 
         
-        function this = matRad_DoseEngineParticlePB(pln)
+        function this = matRad_DoseEngineAnalytical(pln)
             % Constructor
             %
             % call
@@ -132,11 +160,6 @@ classdef matRad_DoseEngineParticlePB < DoseEngines.matRad_DoseEnginePencilBeam
             % allocate LET containner and let sparse matrix in dij struct
             if this.calcLET
                 dij = this.allocateLETContainer(dij,pln);
-            end
-
-            % allocate CD containner and CD sparse matrix in dij struct
-            if this.calcClusterDose
-                dij = this.allocateClusterDoseContainer(dij,pln);
             end
 
             % generates tissue class matrix for biological optimization
@@ -353,6 +376,9 @@ classdef matRad_DoseEngineParticlePB < DoseEngines.matRad_DoseEnginePencilBeam
                                     if length(this.machine.data(energyIx).LatCutOff.CutOff) > 1
                                         currIx(currIx) = matRad_interp1((this.machine.data(energyIx).LatCutOff.depths + offsetRadDepth)',...
                                             (this.machine.data(energyIx).LatCutOff.CutOff.^2)', radDepths(currIx)) >= currRadialDist_sq(currIx);
+                                        %currIx(currIx) = this.calcAnalyticalBragg(basedata.energy, radDepths, this.modeWidth).*conversionFactor;
+                                        %currIx(currIx) = matRad_interp1((this.machine.data(energyIx).LatCutOff.depths + offsetRadDepth)',...
+                                        %    (this.machine.data(energyIx).LatCutOff.CutOff.^2)', radDepths(currIx)) >= currRadialDist_sq(currIx);
                                     end
                                 else
                                     matRad_cfg.dispError('Cutoff must be a value between 0 and 1!')
@@ -446,45 +472,6 @@ classdef matRad_DoseEngineParticlePB < DoseEngines.matRad_DoseEnginePencilBeam
                                   % Save LET for every bixel in cell array
                                   this.letDoseTmpContainer{mod(counter-1,this.numOfBixelsContainer)+1,1} = sparse(this.VdoseGrid(ix(currIx)),1,bixelLET.*bixelDose,dij.doseGrid.numOfVoxels,1);
                                 end
-                                if isfield(dij,'mClusterDose') 
-                                    fieldIdx        = find(contains(fields(this.machine.data(energyIx)), 'cluster'));
-                                    fieldClusterD   = fields(this.machine.data(energyIx));
-                                    fieldClusterD   = fieldClusterD{fieldIdx}; 
-                                    if ~isempty(this.machine.data(energyIx).(fieldClusterD))
-                                      % calculate particle F4 cluster dose for bixel k on ray j of beam i
-                                      %depths = this.machine.data(energyIx).depths + this.machine.data(energyIx).offset; 
-                                        %
-                                      bixelClusterDose = this.calcParticleClusterDoseBixel(...
-                                          currRadDepths, ...
-                                          currRadialDist_sq(currIx), ...
-                                          sigmaIni_sq, ...
-                                          this.machine.data(energyIx), ...
-                                          this.clusterDoseIP, ...
-                                          this.machine.data(energyIx).energy);
-                                        %}
-                                     %{
-                                      if this.clusterDoseIP(1) == 'F'
-                                        Fields = fieldnames(this.machine.data(energyIx).clusterdose.Fk);
-                                        bixelClusterDose = matRad_interp1(depths,this.machine.data(energyIx).clusterdose.Fk.(Fields{str2num(this.clusterDoseIP(2))}),currRadDepths); 
-                                      end
-                                      if this.clusterDoseIP(1) == 'N'
-                                        Fields = fieldnames(this.machine.data(energyIx).clusterdose.Nk);
-                                        bixelClusterDose = matRad_interp1(depths,this.machine.data(energyIx).clusterdose.Nk.(Fields{str2num(this.clusterDoseIP(2))}),currRadDepths); 
-                                      end
-                                     %}
-                                   else
-                                        bixelClusterDose = zeros(size(currRadDepths));
-                                   end
-                                    
-                                    %bixelClusterDose = bixelClusterDose .* bixelDose;
-                                    %
-                                    %
-
-                                  % Save IP CD for every bixel in cell array
-                                  this.clusterDoseTmpContainer{mod(counter-1,this.numOfBixelsContainer)+1,1} = sparse(this.VdoseGrid(ix(currIx)),1,bixelClusterDose,dij.doseGrid.numOfVoxels,1);
-                                    
-                                end
-                                
                             end
 
 
@@ -603,26 +590,6 @@ classdef matRad_DoseEngineParticlePB < DoseEngines.matRad_DoseEnginePencilBeam
               end
             
         end
-
-        function dij = allocateClusterDoseContainer(this,dij,pln)
-        % allocate space for container used in Cluster Dose calculation
-
-              % get MatLab Config instance for displaying warings  
-              matRad_cfg = MatRad_Config.instance();
-              if isfield(this.machine.data,'clusterdose') || isfield(this.machine.data, 'clusterDose')
-                this.clusterDoseTmpContainer = cell(this.numOfBixelsContainer,dij.numOfScenarios);
-                
-                % Allocate space for dij.clusterdose sparse matrix
-                for i = 1:dij.numOfScenarios
-                    dij.mClusterDose{i} = spalloc(dij.doseGrid.numOfVoxels,this.numOfColumnsDij,1);
-                    
-                end
-
-              else
-                matRad_cfg.dispWarning('clusterdose not available in the machine data. Cluster Dose will not be calculated.');
-              end
-            
-        end
                  
         function dij = fillDij(this,dij,stf,pln,counter)
         % Sequentially fill the sparse matrix dij from the tmpContainer cell array
@@ -648,10 +615,6 @@ classdef matRad_DoseEngineParticlePB < DoseEngines.matRad_DoseEnginePencilBeam
 
                 if isfield(dij,'mLETDose')
                     dij.mLETDose{1}(:,(ceil(counter/this.numOfBixelsContainer)-1)*this.numOfBixelsContainer+1:counter) = [this.letDoseTmpContainer{1:mod(counter-1,this.numOfBixelsContainer)+1,1}];
-                end
-
-                if isfield(dij,'mClusterDose')
-                    dij.mClusterDose{1}(:,(ceil(counter/this.numOfBixelsContainer)-1)*this.numOfBixelsContainer+1:counter) = [this.clusterDoseTmpContainer{1:mod(counter-1,this.numOfBixelsContainer)+1,1}];
                 end
 
                 if this.calcBioDose
@@ -681,13 +644,6 @@ classdef matRad_DoseEngineParticlePB < DoseEngines.matRad_DoseEnginePencilBeam
                     if isfield(dij,'mLETDose')
                         dij.mLETDose{1}(:,currBeamIdx) = dij.mLETDose{1}(:,currBeamIdx) + stf(currBeamIdx).ray(currRayIdx).weight(currBixelIdx) * this.letDoseTmpContainer{1,1}; 
                     end
-        %%            
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-                    %
-                    if isfield(dij, 'mClusterDose')
-                        dij.mClusterDose{1}(:,currBeamIdx) = dij.mClusterDose{1}(:,currBeamIdx) + stf(currBeamIdx).ray(currRayIdx).weight(currBixelIdx) * this.clusterDoseTmpContainer{1,1}; 
-                    end
-                    %}
 
                     if this.calcBioDose
                         % score alpha and beta matrices
@@ -705,7 +661,7 @@ classdef matRad_DoseEngineParticlePB < DoseEngines.matRad_DoseEnginePencilBeam
             end
         end
         
-        function dose = calcParticleDoseBixel(~, radDepths, radialDist_sq, sigmaIni_sq, baseData)
+        function dose = calcParticleDoseBixel(this, radDepths, radialDist_sq, sigmaIni_sq, baseData)
         % matRad visualization of two-dimensional dose distributions 
         % on ct including segmentation
         % 
@@ -742,29 +698,11 @@ classdef matRad_DoseEngineParticlePB < DoseEngines.matRad_DoseEnginePencilBeam
 
         % convert from MeV cm^2/g per primary to Gy mm^2 per 1e6 primaries
         conversionFactor = 1.6021766208e-02;
-
-        if ~isfield(baseData,'sigma')
-
-            % interpolate depth dose, sigmas, and weights    
-            X = matRad_interp1(depths,[conversionFactor*baseData.Z baseData.sigma1 baseData.weight baseData.sigma2],radDepths);
-
-            % set dose for query > tabulated depth dose values to zero
-            X(radDepths > max(depths),1) = 0;
-
-            % compute lateral sigmas
-            sigmaSq_Narr = X(:,2).^2 + sigmaIni_sq;
-            sigmaSq_Bro  = X(:,4).^2 + sigmaIni_sq;
-
-            % calculate lateral profile
-            L_Narr =  exp( -radialDist_sq ./ (2*sigmaSq_Narr))./(2*pi*sigmaSq_Narr);
-            L_Bro  =  exp( -radialDist_sq ./ (2*sigmaSq_Bro ))./(2*pi*sigmaSq_Bro );
-            L = baseData.LatCutOff.CompFac * ((1-X(:,3)).*L_Narr + X(:,3).*L_Bro);
-
-            dose = X(:,1).*L;
-        else
-
-            % interpolate depth dose and sigma
-            X = matRad_interp1(depths,[conversionFactor*baseData.Z baseData.sigma],radDepths);
+            
+            % compute integrated dose and lateral sigma
+            Z = this.calcAnalyticalBragg(baseData.energy, radDepths, this.modeWidth).*conversionFactor;
+            X = this.calcSigmaLatMCS(radDepths, baseData.energy);
+            X = [Z, X];
 
             %compute lateral sigma
             sigmaSq = X(:,2).^2 + sigmaIni_sq;
@@ -772,277 +710,12 @@ classdef matRad_DoseEngineParticlePB < DoseEngines.matRad_DoseEnginePencilBeam
             % calculate dose
             dose = baseData.LatCutOff.CompFac * exp( -radialDist_sq ./ (2*sigmaSq)) .* X(:,1) ./(2*pi*sigmaSq);
 
-         end
-
         % check if we have valid dose values
         if any(isnan(dose)) || any(dose<0)
            error('Error in particle dose calculation.');
         end 
         end
-
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        function cluster_dose = calcParticleClusterDoseBixel(this, radDepths, radialDist_sq, sigmaIni_sq, baseData, IPname, Energ)
-        % matRad visualization of two-dimensional cluster dose distributions 
-        % on ct including segmentation
-        % 
-        % call
-        %   cluster_dose = this.calcParticleClusterDoseBixel(radDepths, radialDist_sq, sigmaIni_sq, baseData)
-        %
-        % input
-        %   radDepths:      radiological depths
-        %   radialDist_sq:  squared radial distance in BEV from central ray
-        %   sigmaIni_sq:    initial Gaussian sigma^2 of beam at patient surface
-        %   baseData:       base data required for particle cluster dose calculation
-        %
-        % output
-        %   cluster_dose:   particle cluster_dose at specified locations as linear vector
-        %
-        % References
-        %   [1] http://iopscience.iop.org/0031-9155/41/8/005
-        %
-        % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        %
-        % Copyright 2015 the matRad development team. 
-        % 
-        % This file is part of the matRad project. It is subject to the license 
-        % terms in the LICENSE file found in the top-level directory of this 
-        % distribution and at https://github.com/e0404/matRad/LICENSES.txt. No part 
-        % of the matRad project, including this file, may be copied, modified, 
-        % propagated, or distributed except according to the terms contained in the 
-        % LICENSE file.
-        %
-        % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-        % add potential offset
-        depths = baseData.depths + baseData.offset;
-        %depths = baseData.cddepth;
-
-        % convert from mm^2/g per primary to mm^2/kg per 1e6 primaries 
-        %conversionFactor = 10^9; % to have 1/kg * mm^2 per 10^6 primaries
-        conversionFactor = 1;
-
-        if ~this.clusterDoseFromFluence
-            if ~(isfield(baseData, 'clusterdose') || isfield(baseData, 'clusterDose'))
-                error('Cluster dose data not found');
-            end
-
-        if isfield(baseData, 'clusterdose') % Do the old computation
-
-            if ~isfield(baseData,'sigma')
-
-                % interpolate depth cluster dose, sigmas, and weights
-                if IPname(1) == 'F'
-                    Fields  = fieldnames(baseData.clusterdose.Fk);
-                    X = matRad_interp1(depths,[conversionFactor.*baseData.clusterdose.Fk.(Fields{str2num(IPname(2))}) baseData.sigma1 baseData.weight baseData.sigma2],radDepths);
-                elseif IPname(1) == 'N'
-                    Fields = fieldnames(baseData.clusterdose.Nk);
-                    X = matRad_interp1(depths,[conversionFactor.*baseData.clusterdose.Nk.(Fields{str2num(IPname(2))}) baseData.sigma1 baseData.weight baseData.sigma2],radDepths);
-                end
-                % set dose for query > tabulated depth dose values to zero
-                X(radDepths > max(depths),1) = 0;
-
-                % compute lateral sigmas
-                sigmaSq_Narr = X(:,2).^2 + sigmaIni_sq;
-                sigmaSq_Bro  = X(:,4).^2 + sigmaIni_sq;
-
-                % calculate lateral profile
-                L_Narr = exp( -radialDist_sq ./ (2*sigmaSq_Narr))./(2*pi*sigmaSq_Narr);
-                L_Bro  = exp( -radialDist_sq ./ (2*sigmaSq_Bro ))./(2*pi*sigmaSq_Bro );
-                L = baseData.LatCutOff.CompFac * ((1-X(:,3)).*L_Narr + X(:,3).*L_Bro);
-
-                cluster_dose = X(:,1).*L;
-            else
-
-                % interpolate depth dose and sigma
-                if IPname(1) == 'F'
-                    Fields = fieldnames(baseData.clusterdose.Fk);
-                    X = matRad_interp1(depths,[baseData.clusterdose.Fk.(Fields{str2num(IPname(2:end))}) baseData.sigma],radDepths);
-                elseif IPname(1) == 'N'
-                    Fields = fieldnames(baseData.clusterdose.Nk);
-                    X = matRad_interp1(depths,[baseData.clusterdose.Nk.(Fields{str2num(IPname(2:end))}) baseData.sigma],radDepths);
-                end
-
-                %compute lateral sigma
-                sigmaSq = X(:,2).^2 + sigmaIni_sq;
-
-                % calculate dose
-                cluster_dose = baseData.LatCutOff.CompFac * exp( -radialDist_sq ./ (2*sigmaSq)) .* X(:,1) ./(2*pi*sigmaSq);
-
-            end
-        elseif isfield(baseData, 'clusterDose') % Do the new calculation
-            if isfield(baseData.clusterDose.Fk, 'k') && isfield(baseData.clusterDose.Nk, 'cDVector')
-                if ~isfield(baseData,'sigma')
-
-                    % interpolate depth cluster dose, sigmas, and weights
-                    if IPname(1) == 'F'
-                        X = matRad_interp1(depths,[conversionFactor.*baseData.clusterDose.Fk(str2num(IPname(2:end))).cDVector' baseData.sigma1 baseData.weight baseData.sigma2],radDepths);
-                    elseif IPname(1) == 'N'
-                        X = matRad_interp1(depths,[conversionFactor.*baseData.clusterDose.Nk(str2num(IPname(2:end))).cDVector' baseData.sigma1 baseData.weight baseData.sigma2],radDepths);
-                    end
-                    % set dose for query > tabulated depth dose values to zero
-                    X(radDepths > max(depths),1) = 0;
-
-                    % compute lateral sigmas
-                    sigmaSq_Narr = X(:,2).^2 + sigmaIni_sq;
-                    sigmaSq_Bro  = X(:,4).^2 + sigmaIni_sq;
-
-                    % calculate lateral profile
-                    L_Narr = exp( -radialDist_sq ./ (2*sigmaSq_Narr))./(2*pi*sigmaSq_Narr);
-                    L_Bro  = exp( -radialDist_sq ./ (2*sigmaSq_Bro ))./(2*pi*sigmaSq_Bro );
-                    L = baseData.LatCutOff.CompFac * ((1-X(:,3)).*L_Narr + X(:,3).*L_Bro);
-
-                    cluster_dose = X(:,1).*L;
-                else
-
-                    % interpolate depth dose and sigma
-                    if IPname(1) == 'F'
-                        X = matRad_interp1(depths,[conversionFactor.*baseData.clusterDose.Fk(str2num(IPname(2:end))).cDVector' baseData.sigma],radDepths);
-                    elseif IPname(1) == 'N'
-                        X = matRad_interp1(depths,[conversionFactor.*baseData.clusterDose.Nk(str2num(IPname(2:end))).cDVector' baseData.sigma],radDepths);
-                    end
-
-                    %compute lateral sigma
-                    sigmaSq = X(:,2).^2 + sigmaIni_sq;
-
-                    % calculate dose
-                    cluster_dose = baseData.LatCutOff.CompFac * exp( -radialDist_sq ./ (2*sigmaSq)) .* X(:,1) ./(2*pi*sigmaSq);
-
-                end
-            else
-                error('Format not yet supported for cluster dose.')
-            end
         
-        end
-        else % Cluster dose computation from fluence kernels
-            if ~isfield(baseData, 'fluence')
-                error('basedata: fluence structure not found.');
-            end
-            if ~(isfield(baseData.fluence, 'spectra') && isfield(baseData.fluence, 'energyBin'))
-                error('basedata: fluence structure not yet supported.');
-            end
-            if ~(isfield(baseData.fluence.spectra, 'Z') && isfield(baseData.fluence.spectra, 'A') && isfield(baseData.fluence.spectra, 'fluenceSpectrum'))
-                error('basedata: fluence Spectra and particle classes not found.');
-            end
-
-            clusterDoseDepth = matRad_calcTotalIPxFluenceInDepth(baseData, this.clusterDoseIP)';
-
-            % Interpolation
-            if ~isfield(baseData,'sigma')
-
-                % interpolate depth cluster dose, sigmas, and weights
-                X = matRad_interp1(depths,[conversionFactor.*clusterDoseDepth baseData.sigma1 baseData.weight baseData.sigma2],radDepths);
-
-                % set dose for query > tabulated depth dose values to zero
-                X(radDepths > max(depths),1) = 0;
-
-                % compute lateral sigmas
-                sigmaSq_Narr = X(:,2).^2 + sigmaIni_sq;
-                sigmaSq_Bro  = X(:,4).^2 + sigmaIni_sq;
-
-                % calculate lateral profile
-                L_Narr = exp( -radialDist_sq ./ (2*sigmaSq_Narr))./(2*pi*sigmaSq_Narr);
-                L_Bro  = exp( -radialDist_sq ./ (2*sigmaSq_Bro ))./(2*pi*sigmaSq_Bro );
-                L = baseData.LatCutOff.CompFac * ((1-X(:,3)).*L_Narr + X(:,3).*L_Bro);
-
-                cluster_dose = X(:,1).*L;
-            else
-
-                % interpolate depth dose and sigma
-                X = matRad_interp1(depths,[conversionFactor.*clusterDoseDepth baseData.sigma],radDepths);
-
-                %compute lateral sigma
-                sigmaSq = X(:,2).^2 + sigmaIni_sq;
-
-                % calculate dose
-                cluster_dose = baseData.LatCutOff.CompFac * exp( -radialDist_sq ./ (2*sigmaSq)) .* X(:,1) ./(2*pi*sigmaSq);
-
-            end
-        end
-        % check if we have valid dose values
-        if any(isnan(cluster_dose)) || any(cluster_dose<0)
-           error('Error in cluster dose calculation.');
-        end 
-        end%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%% PROTOTYPE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        function cluster_dose_flexible = calcParticleClusterDoseBixelWFluence(~, radDepths, radialDist_sq, sigmaIni_sq, baseData, IPname, Energ, baseDataIP)
-
-        % add potential offset
-        depths = baseData.depths + baseData.offset;
-
-        % convert from mm^2/g per primary to mm^2/kg per 1e6 primaries 
-        %conversionFactor = 10^9; % to have 1/kg * mm^2 per 10^6 primaries
-        conversionFactor = 1;
-        
-        if isfield(baseData,'sigma')
-
-            % interpolate depth fluence/energy histogram, sigma/s, and weights
-            if IPname(1) == 'F'
-                
-                IPindex         = str2num(IPname(2));
-                Fragments       = fieldnames(baseData.Spectrum);    %How many particle types/fragments do we have in the basedata?  
-                PHIxIP          = zeros(length(radDepths), 1);
-
-                % [1] - Compute the weighted sum PHI x IP
-                for i=1:length(Fragments)
-                    % Interp fluence/energy histograms for each depth
-                    % Interp sigma
-                    interpSP        = matRad_interp1(baseData.depths, [baseData.sigma baseData.Spectrum.(Fragments(i)).dNdE], radDepths);
-                    fragmentSP      = interpSP(:, [2:end]);
-                    % Interp the IP (Ionization Parameter) for each energy
-                    % class (same particle)
-                    energyClasses   = zeros(size(baseData.Spectrum.E));
-                    energyClasses(1)= baseData.Spectrum.E(1)/2;
-                    for j=2:length(energyClasses)
-                        energyClasses(j) = ( baseData.Spectrum.E(j) -  baseData.Spectrum.E(j) )./2;
-                    end
-                    energyClasses   = energyClasses';
-                    interpIP        = matRad_interp1(baseDataIP.particle.IonizationFk(:, 1), baseDataIP.particle.IonizationFk(:, IPindex + 1), energyClasses);
-                    % Weighted sum of fluence (PHI) x IP [total in radDepths]
-                    PHIxIP          = PHIxIP + fragmentSP*interpIP; %This is a column vector with the weighted sum of the IP for each radDepth
-                end
-                X = [PHIxIP interpSP(:, 1)];
-
-            elseif IPname(1) == 'N'
-                %{
-                Fields = fieldnames(baseData.clusterdose.Nk);    
-                cd = conversionFactor.*baseData.clusterdose.Nk.(Fields{str2num(IPname(2))});
-                X = matRad_interp1(depths,[cd baseData.sigma1 baseData.weight baseData.sigma2],radDepths);
-                %}
-            end
-
-            % set dose for query > tabulated depth dose values to zero
-            X(radDepths > max(depths),1) = 0;
-
-            % compute lateral sigmas
-            %{
-            sigmaSq_Narr = X(:,2).^2 + sigmaIni_sq;
-            sigmaSq_Bro  = X(:,4).^2 + sigmaIni_sq;
-            %}
-            sigmaSq     = X(:,2).^2 + sigmaIni_sq;
-
-            % calculate lateral profile
-            %{
-            L_Narr = exp( -radialDist_sq ./ (2*sigmaSq_Narr))./(2*pi*sigmaSq_Narr);
-            L_Bro  = exp( -radialDist_sq ./ (2*sigmaSq_Bro ))./(2*pi*sigmaSq_Bro );
-            %L = exp( -radialDist_sq ./ (2*sigma_mcs ))./(2*pi*sigma_mcs );
-            L = baseData.LatCutOff.CompFac * ((1-X(:,3)).*L_Narr + X(:,3).*L_Bro);
-            %L = ((1-X(:,3)).*L_Narr + X(:,3).*L_Bro);
-            %}
-
-            %[2] - Lateral spread of the cluster dose
-            L = exp( -radialDist_sq ./ (2*sigmaSq))./(2*pi*sigmaSq);
-            cluster_dose_flexible = X(:,1).*L;
-        
-        end
-        end
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
-
         function calcLateralParticleCutOff(this,cutOffLevel,stf)
             % matRad function to calculate a depth dependend lateral cutoff 
             % for each pristine particle beam
@@ -1123,16 +796,9 @@ classdef matRad_DoseEngineParticlePB < DoseEngines.matRad_DoseEnginePencilBeam
                 energyIx = max(round2(energySigmaLUT(i,1),4)) == round2([this.machine.data.energy],4);
 
                 currFoci = energySigmaLUT(i,2);
-                % MODIFICATION temporary
-                if energySigmaLUT(i,3) <= this.machine.data(energyIx).initFocus.dist(currFoci,end)
-                    sigmaIni = matRad_interp1(this.machine.data(energyIx).initFocus.dist(currFoci,:)',...
+                sigmaIni = matRad_interp1(this.machine.data(energyIx).initFocus.dist(currFoci,:)',...
                                           this.machine.data(energyIx).initFocus.sigma(currFoci,:)',...
                                           energySigmaLUT(i,3));
-                else % This else is just for a draft, has to be removed. We only want to fully interpolate.
-                    sigmaIni = spline(this.machine.data(energyIx).initFocus.dist(currFoci,:)',...
-                                          this.machine.data(energyIx).initFocus.sigma(currFoci,:)',...
-                                          energySigmaLUT(i,3));
-                end
                 sigmaIni_sq = sigmaIni^2;
 
                 % consider range shifter for protons if applicable
@@ -1200,8 +866,10 @@ classdef matRad_DoseEngineParticlePB < DoseEngines.matRad_DoseEnginePencilBeam
                     idd = sumGauss(depthValues,this.machine.data(energyIx).Z.mean,...
                                                this.machine.data(energyIx).Z.width.^2,...
                                                this.machine.data(energyIx).Z.weight) * conversionFactor;
-                else
-                    idd  = matRad_interp1(this.machine.data(energyIx).depths,this.machine.data(energyIx).Z,depthValues) * conversionFactor; 
+                else%if this.calcBortfeldBragg
+                    idd = this.calcAnalyticalBragg(this.machine.data(energyIx).energy,depthValues,this.modeWidth)*conversionFactor;
+                %else
+                %    idd  = matRad_interp1(this.machine.data(energyIx).depths,this.machine.data(energyIx).Z,depthValues) * conversionFactor; 
                 end
 
                 cnt = cnt +1 ;
@@ -1387,7 +1055,167 @@ classdef matRad_DoseEngineParticlePB < DoseEngines.matRad_DoseEnginePencilBeam
             end
         end
 
+        function doseVector = calcAnalyticalBragg(this, primaryEnergy, depthZ, widthMod)
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %   call 
+        %     this.calcAnalyticalBragg(PrimaryEnergy, depthz, WidthMod)
+        %       ===========================================================
+        %       Purpose: Compute depth-dose curve i.e. the Bragg Peak
+        %                in 'Bortfeld 1998' formalism.
+        %
+        %       Input  : primaryEnergy -- Parameter (primaryEnergy > 0, it 
+        %                                 is the primary energy of the beam
+        %                                 )
+        %                depthZ --------- Argument (depthZ > 0,
+        %                                 depth in the target material).
+        %                widthMod ------- Parameter 
+        %                                 (widthMod = 0 for a beam that
+        %                                 is monoenergetic;
+        %                                 WidthMod = 1 for a beam with 
+        %                                 initial gaussian energy spectrum)
+        %       Output : doseVector ----- Depth dose curve; same size of 
+        %                                 depthZ 
+        %       ===========================================================
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %       This function was inspired by the paper from 
+        %       Thomas Bortfeld (1997) "An analytical approximation of the 
+        %       Bragg curve for therapeutic proton beams".
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         
+        numberDensity   = this.massDensity*this.avogadroNum/this.MM;                                      % Number density of molecules per cm^3
+        alphaPrime      = this.electronCharge^2*numberDensity*this.Z/(4*pi*this.epsilon0^2)/10^8;   % Bohr's formula for d(sigmaE)^2/dz
+
+
+            %% Conversion of depth value from mm to cm
+            depthZ  = depthZ./10;
+
+            %% Compute Range and sigma
+            
+            range = this.alpha*primaryEnergy.^this.p;                                                           % Range-Energy relation, i.e. Bragg-Kleemann rule
+            sigmaMonoSquared = alphaPrime*this.p^2*this.alpha^(2/this.p)*range.^(3-2/this.p)./(3-2/this.p);     % Squared Range straggling width
+            sigmaMono = sqrt(sigmaMonoSquared);                                                                 % Range straggling width
+            
+            %% Compute the width of straggling, determined by widthMod
+
+            if widthMod == 0
+                wid = sigmaMono;
+            elseif widthMod ==1
+                energyStraggling = this.sigmaEnergy*primaryEnergy;                                                                               % Gaussian energy straggling
+                sigmaTot = sqrt( sigmaMonoSquared + (energyStraggling^2) .*(this.alpha^2) .*(this.p^2) .*(primaryEnergy.^(2*this.p-2)) );   % Total straggling contribution: range + energy
+                wid = sigmaTot;
+            else
+                error('Wrong value for WidthMod. Choose 0 for a monoenergetic beam, or choose 1 for a gaussian energy distribution');
+            end
+
+            % COEFFICIENTS IN THE BRAGG CURVE (WITHOUT STRAGGLING)
+            coeffA   = this.phi0*(1-this.epsilonTail)./(this.massDensity*this.p*this.alpha^(1/this.p)*(1+this.beta*range));
+            coeffA1  = coeffA;                                                % Coefficient of D1
+            coeffA2  = coeffA*this.beta*(1+this.gammaNuc*this.p);            % Coefficient of D2
+            coeffA3  = coeffA*this.epsilonTail*this.p./((1-this.epsilonTail)*range);              % Coefficient of Dtail
+            coeffA23 = coeffA2 + coeffA3;
+            
+            %% Definition of the Depth - Dose curve without straggling
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            %       =======================================================
+            %       Purpose: compute the depth-dose curve without energy 
+            %                straggling hatD(z, E) (see Bortfeld 1997)
+            %       Input  : depthZ --- Argument:  depth in the target 
+            %                                      material
+            %                range  --- Parameter: range dependent on beam
+            %                                      primaryEnergy
+            %       Output : hatD = hatD(z, E)
+            %       =======================================================
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+            hatD1  = coeffA1.*(range-depthZ).^(1/this.p-1);         % MCS contribution
+            hatD2  = coeffA23.*(range-depthZ).^(1/this.p);          % Nuclear and MCS contribution
+            hatD   = (hatD1+hatD2)  .*(depthZ<=range)...            % Total depth-dose curve without straggling
+                     + 0            .*(depthZ>range);
+
+            %% Depth-Dose curve, i.e. the Bragg peak
+
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            %       ===================================================================
+            %       Purpose: compute the depth-dose curve i.e. the Bragg 
+            %                Peak, as defined in Bortfeld 1997 (D(z) in the
+            %                paper). Using the Matlab parabolic cylinder
+            %                function pu(a, z) = D_(-a-1/2)(x). In the 
+            %                first step, the product of gauss and parabolic
+            %                cylinder function is computed.
+            %       Output : depthDose = D(z) ( D(z) in Bortfeld 1997 implici-
+            %                                   tly depends on E and width. )
+            %       ===================================================================
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+            functionGaussXCyl = @(a, x) exp(-x.^2/4).*pu(-a-1/2, x);    %product of gaussian
+                                                                        % and "pu"                                                                        
+
+            coeffD1     = coeffA1/wid;                                                              % coefficient
+            coeffD2     = coeffA23/this.p;                                                          % coefficient
+            coeffD      = wid.^(1/this.p)*gamma(1/this.p)/sqrt(2*pi);                               % coefficient
+            depthDose   = coeffD.*(coeffD1.*functionGaussXCyl(-1/this.p, (depthZ-range)/wid ) ...
+                                 + coeffD2.*functionGaussXCyl(-1/this.p-1, (depthZ-range)/wid )  );
+
+            %% OUTPUT: compute dose vector
+
+            % Dose is computed with hatD in the plateau region, and with
+            % the parabolic cylinder function in the peak region.
+           
+            isPlateau       = depthZ <  range-10*wid;
+            isPeak          = depthZ >= range-10*wid & depthZ <= range+5*wid;
+
+            dosePlateau                     = isPlateau .* hatD;
+            dosePlateau(isnan(dosePlateau)) = 0;
+            dosePeak                        = isPeak    .* depthDose;
+            dosePeak(isnan(dosePeak))       = 0;                        
+            doseVector                      = dosePlateau + dosePeak; 
+            %end
+
+        end
+        
+        function sigmaMCS = calcSigmaLatMCS(this, depthZ, primaryEnergy)
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            %call
+            %   this.SigmaLatMSC_H(depthz, En)
+            %       ===================================================================
+            %       Purpose: Compute the lateral displacement of a particle beam due to
+            %                Multiple Coulomb Scattering, as function of the depth in
+            %                the target material and in Highland approximation.
+            %       Input  : PrimaryEnergy -- Parameter (PrimaryEnergy > 0, it is the
+            %                                 primary energy of the beam)
+            %                z -------------- Argument (z > 0, it is the actual
+            %                                 depth in the target material)
+            %       Output : displ ---------- SigmaLatMCS_H(z, E)
+            %       ===================================================================
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            %       This function was inspired by the paper from Gottschalk et al.1992.
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            
+
+            %% Conversion of depth value from mm to cm
+            depthZ  = depthZ./10;
+            %z       = depthz;
+
+            range = this.alpha*primaryEnergy.^this.p;        % Range-Energy relation, i.e. Bragg-Kleemann rule
+
+            sigma1      = @(z)      14.1^2 /this.radLenght * (1+1/9*log10(z./this.radLenght)).^2;
+            sigma21     = @(z)   1  ./(1-2/this.p)  .*( range.^(1-2/this.p).*(range-z).^2 - (range-z).^(3-2/this.p) );
+            sigma22     = @(z)   -2*(range-z)  ./(2-2/this.p)  .*( range.^(2-2/this.p) - (range-z).^(2-2/this.p) );
+            sigma23     = @(z)   1   ./(3-2/this.p)  .*( range.^(3-2/this.p) - (range-z).^(3-2/this.p) );
+            sigmaTot    = @(z) this.alpha^(1/this.p)/2  *sqrt( sigma1(z) .*( sigma21(z) + sigma22(z) + sigma23(z) ) );
+            sigmaBeyond   = sigmaTot(range);
+
+
+            isBelowR    = depthZ<=range;
+            isBeyondR   = depthZ>range;
+            sigmaBelowRange     = sigmaTot(depthZ)  .* isBelowR;
+            sigmaBeyondRange    = sigmaBeyond       .*isBeyondR ;
+            
+            sigmaMCS = 10.* (sigmaBelowRange + sigmaBeyondRange);      %output in mm
+            
+            sigmaMCS(depthZ==0) = 0;
+
+        end
     end
     
     methods (Static)
@@ -1424,7 +1252,7 @@ classdef matRad_DoseEngineParticlePB < DoseEngines.matRad_DoseEnginePencilBeam
             dataType = machine.meta.dataType;
             if strcmp(dataType,'singleGauss')
                 checkData = all(isfield(machine.data,{'energy','depths','Z','peakPos','sigma','offset','initFocus'}));
-            elseif strcmp(dataType,'doubleGauss') || strcmp(dataType, 'doubleGaussian') % MODIFICATION maybe make it consistent with just 1 unique field
+            elseif strcmp(dataType,'doubleGauss')
                 checkData = all(isfield(machine.data,{'energy','depths','Z','peakPos','weight','sigma1','sigma2','offset','initFocus'}));
             else
                 checkData = false;
@@ -1434,3 +1262,4 @@ classdef matRad_DoseEngineParticlePB < DoseEngines.matRad_DoseEnginePencilBeam
         end
     end
 end
+

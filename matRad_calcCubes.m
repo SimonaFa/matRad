@@ -104,6 +104,15 @@ if isfield(dij,'mAlphaDose') && isfield(dij,'mSqrtBetaDose')
     end
 end
 
+if isfield(dij,'mClusterDose')
+    for i = 1:length(beamInfo)
+        clusterDoseCube = dij.mClusterDose{scenNum} * (resultGUI.w .* beamInfo(i).logIx);
+        resultGUI.(['clusterDose', beamInfo(i).suffix]) = zeros(dij.doseGrid.dimensions);
+        resultGUI.(['clusterDose', beamInfo(i).suffix]) = clusterDoseCube;
+        resultGUI.(['clusterDose', beamInfo(i).suffix]) = reshape(full(clusterDoseCube),dij.doseGrid.dimensions);
+    end
+end
+
 % group similar fields together
 resultGUI = orderfields(resultGUI);
 

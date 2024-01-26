@@ -23,6 +23,7 @@ classdef matRad_OptimizationProblem < handle
     
     properties
         BP              %matRad_BackProjection object for mapping & backprojection
+        BP_clusterDose  %optional cluster dose backprojection
         bioOpt = '';
 
         minimumW = NaN;

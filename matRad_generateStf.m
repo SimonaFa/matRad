@@ -66,7 +66,9 @@ if isfield(pln,'propStf') && isfield(pln.propStf,'addMargin')
 end
 
 if addmarginBool
+    tmp = 2*pln.propStf.bixelWidth;
     voiTarget = matRad_addMargin(voiTarget,cst,ct.resolution,ct.resolution,true);
+    %voiTarget = matRad_addMargin(voiTarget,cst,ct.resolution,struct('x',tmp,'y',tmp,'z',tmp),true);
     V   = find(voiTarget>0);
 end
 
@@ -79,10 +81,10 @@ end
 [coordsY_vox, coordsX_vox, coordsZ_vox] = ind2sub(ct.cubeDim,V);
 
 % prepare structures necessary for particles
-machine = matRad_loadMachine(pln);
+machine = matRad_loadMachine(pln); 
 SAD = machine.meta.SAD;
 
-if strcmp(pln.radiationMode,'protons') || strcmp(pln.radiationMode,'carbon')
+if strcmp(pln.radiationMode,'protons') || strcmp(pln.radiationMode,'carbon') || strcmp(pln.radiationMode,'helium')
       
     availableEnergies = [machine.data.energy];
     availablePeakPos  = [machine.data.peakPos] + [machine.data.offset];
@@ -233,7 +235,7 @@ for i = 1:length(pln.propStf.gantryAngles)
                              [{ct.cube{1}} {voiTarget}]);
 
         % find appropriate energies for particles
-       if strcmp(stf(i).radiationMode,'protons') || strcmp(stf(i).radiationMode,'carbon')
+       if strcmp(stf(i).radiationMode,'protons') || strcmp(stf(i).radiationMode,'carbon') || strcmp(stf(i).radiationMode, 'helium')
 
            % target hit
            if sum(rho{2}) > 0 
@@ -513,7 +515,7 @@ for i = 1:length(pln.propStf.gantryAngles)
     end
     
     % include rangeshifter data if not yet available 
-    if strcmp(pln.radiationMode, 'protons') || strcmp(pln.radiationMode, 'carbon')
+    if strcmp(pln.radiationMode, 'protons') || strcmp(pln.radiationMode, 'carbon') || strcmp(pln.radiationMode, 'helium')
         for j = 1:stf(i).numOfRays
             for k = 1:numel(stf(i).ray(j).energy)
                 stf(i).ray(j).rangeShifter(k).ID = 0;

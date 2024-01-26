@@ -1,5 +1,5 @@
-classdef matRad_SquaredOverdosing < DoseObjectives.matRad_DoseObjective
-% matRad_SquaredOverdosing Implements a penalized squared overdosing objective
+classdef matRad_cdSquaredUnderdosing < ClusterDoseObjectives.matRad_ClusterDoseObjective
+% matRad_SquaredUnderdosing Implements a penalized squared underdosing objective
 %   See matRad_DoseObjective for interface description
 %
 % References
@@ -17,20 +17,20 @@ classdef matRad_SquaredOverdosing < DoseObjectives.matRad_DoseObjective
 % LICENSE file.
 %
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    
+
     properties (Constant)
-        name = 'Squared Overdosing';
-        parameterNames = {'d^{max}'};
-        parameterTypes = {'dose'};
+        name = 'Squared Underdosing';
+        parameterNames = {'cd^{min}'};
+        parameterTypes = {'clusterdose'};
     end
     
     properties
-        parameters = {30};
+        parameters = {60};
         penalty = 1;
     end
     
     methods
-        function obj = matRad_SquaredOverdosing(penalty,dMax)
+        function obj = matRad_cdSquaredUnderdosing(penalty,cdMin)
             %If we have a struct in first argument
             if nargin == 1 && isstruct(penalty)
                 inputStruct = penalty;
@@ -41,12 +41,12 @@ classdef matRad_SquaredOverdosing < DoseObjectives.matRad_DoseObjective
             end
             
             %Call Superclass Constructor (for struct initialization)
-            obj@DoseObjectives.matRad_DoseObjective(inputStruct);
+            obj@ClusterDoseObjectives.matRad_ClusterDoseObjective(inputStruct);
             
             %now handle initialization from other parameters
             if ~initFromStruct
-                if nargin == 2 && isscalar(dMax)
-                    obj.parameters{1} = dMax;
+                if nargin == 2 && isscalar(cdMin)
+                    obj.parameters{1} = cdMin;
                 end
                 
                 if nargin >= 1 && isscalar(penalty)
@@ -56,27 +56,27 @@ classdef matRad_SquaredOverdosing < DoseObjectives.matRad_DoseObjective
         end
         
         %% Calculates the Objective Function value
-        function fDose = computeDoseObjectiveFunction(obj,dose)
+        function fDose = computeClusterDoseObjectiveFunction(obj,clusterDose)
             % overdose : dose minus prefered dose
-            overdose = (dose - obj.parameters{1});
+            underdose = clusterDose - obj.parameters{1};
             
             % apply positive operator
-            overdose(overdose<0) = 0;
+            underdose(underdose>0) = 0;
             
             % claculate objective function
-            fDose = obj.penalty/numel(dose) * (overdose'*overdose);
+            fDose = obj.penalty/numel(clusterDose) * (underdose'*underdose);
         end
         
         %% Calculates the Objective Function gradient
-        function fDoseGrad   = computeDoseObjectiveGradient(obj,dose)
+        function fDoseGrad   = computeClusterDoseObjectiveGradient(obj,clusterDose)
             % overdose : dose minus prefered dose
-            overdose = (dose - obj.parameters{1});
+            underdose = clusterDose - obj.parameters{1};
             
             % apply positive operator
-            overdose(overdose<0) = 0;
+            underdose(underdose>0) = 0;
             
             % calculate delta
-            fDoseGrad = 2 * obj.penalty/numel(dose) * overdose;
+            fDoseGrad = 2 * obj.penalty/numel(clusterDose) * underdose;
         end
     end
     

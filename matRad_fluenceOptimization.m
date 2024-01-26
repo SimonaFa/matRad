@@ -45,6 +45,8 @@ cst  = matRad_setOverlapPriorities(cst);
 
 
 % check & adjust objectives and constraints internally for fractionation 
+haveDoseOptimizationFunctions = false;
+haveClusterDoseOptimizationFunctions = false;
 for i = 1:size(cst,1)
     %Compatibility Layer for old objective format
     if isstruct(cst{i,6})
@@ -57,23 +59,42 @@ for i = 1:size(cst,1)
         %In case it is a default saved struct, convert to object
         %Also intrinsically checks that we have a valid optimization
         %objective or constraint function in the end
-        if ~isa(obj,'matRad_DoseOptimizationFunction')
-            try
-                obj = matRad_DoseOptimizationFunction.createInstanceFromStruct(obj);
-            catch
-                matRad_cfg.dispError('cst{%d,6}{%d} is not a valid Objective/constraint! Remove or Replace and try again!',i,j);
+        if isstruct(obj)
+            if strncmp(obj.className,'DoseObjective',13) || strncmp(obj.className,'DoseConstraint',14)
+                try
+                    obj = matRad_DoseOptimizationFunction.createInstanceFromStruct(obj);
+                catch
+                    matRad_cfg.dispError('cst{%d,6}{%d} is not a valid Objective/constraint! Remove or Replace and try again!',i,j);
+                end
+            elseif strncmp(obj.className,'ClusterDoseObjective',20)
+                try
+                    obj = matRad_ClusterDoseOptimizationFunction.createInstanceFromStruct(obj);
+                catch
+                    matRad_cfg.dispError('cst{%d,6}{%d} is not a valid Objective/constraint! Remove or Replace and try again!',i,j);
+                end
+                %obj.setClusterDose
+            else 
+                %error message, or check implementation on branch research/DADR
             end
         end
-        
-        obj = obj.setDoseParameters(obj.getDoseParameters()/pln.numOfFractions);
-        
+        if isa(obj,'matRad_DoseOptimizationFunction')
+            obj = obj.setDoseParameters(obj.getDoseParameters()/pln.numOfFractions);
+            haveDoseOptimizationFunctions = true;
+        end
+        if isa(obj,'matRad_ClusterDoseOptimizationFunction')
+            obj = obj.setDoseParameters(obj.getDoseParameters()/pln.numOfFractions);
+            haveClusterDoseOptimizationFunctions = true;
+        end
+
         cst{i,6}{j} = obj;        
     end
 end
 
+
 % resizing cst to dose cube resolution 
 cst = matRad_resizeCstToGrid(cst,dij.ctGrid.x,dij.ctGrid.y,dij.ctGrid.z,...
                                  dij.doseGrid.x,dij.doseGrid.y,dij.doseGrid.z);
+
 
 % find target indices and described dose(s) for weight vector
 % initialization
@@ -119,10 +140,12 @@ elseif  strcmp(pln.propOpt.bioOptimization,'const_RBExD') && strcmp(pln.radiatio
     if ~isfield(dij,'RBE')
         dij.RBE = 1.1;
     end
+    
     doseTmp = dij.physicalDose{1}*wOnes;
     bixelWeight =  (doseTarget)/(dij.RBE * mean(doseTmp(V)));     
     wInit       = wOnes * bixelWeight;
-        
+    
+
 elseif (strcmp(pln.propOpt.bioOptimization,'LEMIV_effect') || strcmp(pln.propOpt.bioOptimization,'LEMIV_RBExD')) ... 
                                 && strcmp(pln.radiationMode,'carbon')
                             
@@ -177,9 +200,19 @@ elseif (strcmp(pln.propOpt.bioOptimization,'LEMIV_effect') || strcmp(pln.propOpt
            wInit    =  ((doseTarget)/(TolEstBio*maxCurrRBE*max(doseTmp(V))))* wOnes;
     end
     
+    
 else 
-    bixelWeight =  (doseTarget)/(mean(dij.physicalDose{1}(V,:)*wOnes)); 
-    wInit       = wOnes * bixelWeight;
+    if ~isempty(dij.mClusterDose)
+        
+        bixelWeight =  (doseTarget)/(mean(dij.mClusterDose{1}(V,:)*wOnes));
+        wInit       = wOnes * bixelWeight;
+        
+    else
+        
+        bixelWeight =  (doseTarget)/(mean(dij.physicalDose{1}(V,:)*wOnes)); 
+        wInit       = wOnes * bixelWeight;
+        
+    end
     pln.propOpt.bioOptimization = 'none';
 end
 
@@ -198,10 +231,16 @@ switch pln.propOpt.bioOptimization
         backProjection = matRad_ConstantRBEProjection;
     case 'LEMIV_RBExD'
         backProjection = matRad_VariableRBEProjection;
+    case 'cluster_Dose'
+        
+        backProjection = matRad_ClusterDoseProjection;
+        
     case 'none'
+        
         backProjection = matRad_DoseProjection;
+        
     otherwise
-        warning(['Did not recognize bioloigcal setting ''' pln.probOpt.bioOptimization '''!\nUsing physical dose optimization!']);
+        warning(['Did not recognize biological setting ''' pln.probOpt.bioOptimization '''!\nUsing physical dose optimization!']);
         backProjection = matRad_DoseProjection;
 end
         
@@ -210,10 +249,18 @@ end
 
 optiProb = matRad_OptimizationProblem(backProjection);
 
+if haveClusterDoseOptimizationFunctions && isfield(dij,"mClusterDose")
+    
+    optiProb.BP_clusterDose = matRad_ClusterDoseProjection;
+    
+end
+
+
 %Get Bounds
 if ~isfield(pln.propOpt,'boundMU')
     pln.propOpt.boundMU = false;
 end 
+
 
 if pln.propOpt.boundMU
     if (isfield(dij,'minMU') || isfield(dij,'maxMU')) && ~isfield(dij,'numParticlesPerMU')
@@ -242,6 +289,7 @@ if ~isfield(pln.propOpt,'optimizer')
     pln.propOpt.optimizer = 'IPOPT';
 end
 
+
 switch pln.propOpt.optimizer
     case 'IPOPT'
         optimizer = matRad_OptimizerIPOPT;
@@ -251,10 +299,11 @@ switch pln.propOpt.optimizer
         warning(['Optimizer ''' pln.propOpt.optimizer ''' not known! Fallback to IPOPT!']);
         optimizer = matRad_OptimizerIPOPT;
 end
-        
+    
 if ~optimizer.IsAvailable()
     matRad_cfg.dispError(['Optimizer ''' pln.propOpt.optimizer ''' not available!']);
 end
+
 
 optimizer = optimizer.optimize(wInit,optiProb,dij,cst);
 

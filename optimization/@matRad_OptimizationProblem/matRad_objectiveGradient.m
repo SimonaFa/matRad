@@ -39,8 +39,16 @@ function weightGradient = matRad_objectiveGradient(optiProb,w,dij,cst)
 optiProb.BP = optiProb.BP.compute(dij,w);
 d = optiProb.BP.GetResult();
 
+if ~isempty(optiProb.BP_clusterDose)
+    
+    optiProb.BP_clusterDose = optiProb.BP_clusterDose.compute(dij,w);
+    clusterDose = optiProb.BP_clusterDose.GetResult();
+    
+end
+
 % Initializes dose gradient
 doseGradient{1} = zeros(dij.doseGrid.numOfVoxels,1);
+clusterDoseGradient{1} = zeros(dij.doseGrid.numOfVoxels,1);
 
 % compute objective function for every VOI.
 for  i = 1:size(cst,1)    
@@ -72,7 +80,12 @@ for  i = 1:size(cst,1)
                 
                 %add to dose gradient
                 doseGradient{1}(cst{i,4}{1}) = doseGradient{1}(cst{i,4}{1}) + objective.computeDoseObjectiveGradient(d_i);                
-            end       
+            end  
+
+            if isa(objective,'ClusterDoseObjectives.matRad_ClusterDoseObjective')
+                cd_i = clusterDose{1}(cst{i,4}{1});
+                clusterDoseGradient{1}(cst{i,4}{1}) = clusterDoseGradient{1}(cst{i,4}{1}) + objective.computeClusterDoseObjectiveGradient(cd_i);
+            end
         end           
     end    
 end
@@ -81,5 +94,12 @@ end
 optiProb.BP = optiProb.BP.computeGradient(dij,doseGradient,w);
 g = optiProb.BP.GetGradient();
 weightGradient = g{1};
+
+if ~isempty(optiProb.BP_clusterDose)
+    optiProb.BP_clusterDose = optiProb.BP_clusterDose.computeGradient(dij,clusterDoseGradient,w);
+    g = optiProb.BP_clusterDose.GetGradient();
+    weightGradient = weightGradient + g{1};
+end
+%
 
 end

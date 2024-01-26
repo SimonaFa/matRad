@@ -1,4 +1,4 @@
-classdef matRad_SquaredDeviation < DoseObjectives.matRad_DoseObjective
+classdef matRad_cdSquaredMinimizer < ClusterDoseObjectives.matRad_ClusterDoseObjective
 % matRad_SquaredDeviation Implements a penalized least squares objective
 %   See matRad_DoseObjective for interface description
 %
@@ -21,18 +21,18 @@ classdef matRad_SquaredDeviation < DoseObjectives.matRad_DoseObjective
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
     properties (Constant)
-        name = 'Squared Deviation';
-        parameterNames = {'d^{ref}'};
-        parameterTypes = {'dose'};
+        name = 'Squared Minimizer';
+        parameterNames = {'cd^{ref}'};
+        parameterTypes = {'clusterdose'};
     end
     
     properties
-        parameters = {60};
+        parameters = {10};
         penalty = 1;
     end
     
     methods
-        function obj = matRad_SquaredDeviation(penalty,dRef)
+        function obj = matRad_cdSquaredMinimizer(penalty)%,dRef)
             
             %If we have a struct in first argument
             if nargin == 1 && isstruct(penalty)
@@ -44,7 +44,7 @@ classdef matRad_SquaredDeviation < DoseObjectives.matRad_DoseObjective
             end
             
             %Call Superclass Constructor (for struct initialization)
-            obj@DoseObjectives.matRad_DoseObjective(inputStruct);
+            obj@ClusterDoseObjectives.matRad_ClusterDoseObjective(inputStruct);
             
             %now handle initialization from other parameters
             if ~initFromStruct
@@ -59,20 +59,23 @@ classdef matRad_SquaredDeviation < DoseObjectives.matRad_DoseObjective
         end
    
         %% Calculates the Objective Function value
-        function fDose = computeDoseObjectiveFunction(obj,dose)
+        function fClusterDose = computeClusterDoseObjectiveFunction(obj,clusterDose)
             % deviation : dose minus prefered dose
-            deviation = (dose - obj.parameters{1});
+            %deviation = dose - obj.parameters{1};
+            deviation = (clusterDose);% - obj.parameters{1});
+            
             % claculate objective function
-            fDose = obj.penalty/numel(dose) * (deviation'*deviation);
+            fClusterDose = obj.penalty/numel(clusterDose) * (deviation'*deviation);
         end
         
         %% Calculates the Objective Function gradient
-        function fDoseGrad   = computeDoseObjectiveGradient(obj,dose)
+        function fClusterDoseGrad   = computeClusterDoseObjectiveGradient(obj,clusterDose)
             % deviation : Dose minus prefered dose
-            deviation = (dose - obj.parameters{1});
-
+            % deviation = dose - obj.parameters{1};
+            deviation = (clusterDose);% - obj.parameters{1});
+            
             % calculate delta
-            fDoseGrad = 2 * obj.penalty/numel(dose) * deviation;
+            fClusterDoseGrad = 2 * obj.penalty/numel(clusterDose) * deviation;
         end
     end
     

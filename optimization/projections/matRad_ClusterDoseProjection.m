@@ -1,4 +1,4 @@
-classdef matRad_DoseProjection < matRad_BackProjection
+classdef matRad_ClusterDoseProjection < matRad_BackProjection
 % matRad_DoseProjection class to compute physical dose during optimization
 %
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -15,28 +15,28 @@ classdef matRad_DoseProjection < matRad_BackProjection
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    
     
     methods
-        function obj = matRad_DoseProjection()
+        function obj = matRad_ClusterDoseProjection()
             
         end
     end
     
     methods 
-        function d = computeSingleScenario(~,dij,scen,w)
-            if ~isempty(dij.physicalDose{scen})
+        function clusterDose = computeSingleScenario(~,dij,scen,w)
+            if ~isempty(dij.mClusterDose{scen})
                 
-                d = dij.physicalDose{scen}*w;
+                clusterDose = dij.mClusterDose{scen}*w;
                 
             else
-                d = [];
+                clusterDose = [];
                 matRad_cfg = MatRad_Config.instance();
                 matRad_cfg.dispWarning('Empty scenario in optimization detected! This should not happen...\n');
             end 
         end
         
-        function wGrad = projectSingleScenarioGradient(~,dij,doseGrad,scen,~)
-            if ~isempty(dij.physicalDose{scen})
+        function wGrad = projectSingleScenarioGradient(~,dij,clusterDoseGrad,scen,~)
+            if ~isempty(dij.mClusterDose{scen})
                 
-                wGrad = (doseGrad{scen}' * dij.physicalDose{scen})';
+                wGrad = (clusterDoseGrad{scen}' * dij.mClusterDose{scen})';
                 
             else
                 wGrad = [];

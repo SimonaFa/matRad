@@ -48,7 +48,6 @@ end
 
 if(isfield(pln,'propDoseCalc') && isfield(pln.propDoseCalc,'engine'))
 
-
     % check if there is an engine field in the pln struct
     % check if it is a dose calc engine and not some other oject
     if isa(pln.propDoseCalc.engine, 'DoseEngines.matRad_DoseEngine')
