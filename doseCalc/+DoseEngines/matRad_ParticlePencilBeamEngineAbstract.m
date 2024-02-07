@@ -23,6 +23,9 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
 
         calcLET = true;                 % Boolean which defines if LET should be calculated
         calcBioDose = false;            % Boolean which defines if biological dose calculation shoudl be performed (alpha*dose and sqrt(beta)*dose)
+        calcClusterDose = true;         % Boolean which defines if Cluster Dose calculation should be performed
+        clusterDoseIP = 'N';            % Choose the Ip for CD calculation
+        clusterDoseK = 4;               % Choose index k for minimum cluster size
 
         visBoolLateralCutOff = false;   % Boolean switch for visualization during+ LeteralCutOff calculation
 
@@ -233,6 +236,17 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
                 X.beta = baseData.beta;
             end   
             
+            % Cluster Dose
+            if this.calcClusterDose
+                if strcmp(this.clusterDoseIP, 'F')
+                    X.clusterDose = baseData.clusterDose.Fk(this.clusterDoseK).cDVector';
+                elseif strcmp(this.clusterDoseIP, 'N')
+                    X.clusterDose = baseData.clusterDose.Nk(this.clusterDoseK).cDVector';
+                else
+                    error('Wrong input Ionization parameter. Choose F or N.');
+                end
+            end
+
             X = structfun(@(v) matRad_interp1(depths,v,bixel.radDepths,'nearest'),X,'UniformOutput',false); %Extrapolate to zero?           
         end
 
@@ -355,6 +369,17 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
                 end
             end
 
+            % allocate Cluster Dose container and CD sparse matrix in dij struct
+            if this.calcClusterDose
+                if isfield(this.machine.data,'clusterDose')
+                    dij = this.allocateClusterDoseContainer(dij);
+                else
+                    matRad_cfg = MatRad_Config.instance();
+                    matRad_cfg.dispWarning('Cluster Dose not available and will not be computed!');
+                    this.calcClusterDose = false;
+                end
+            end
+
             % lateral cutoff for raytracing and geo calculations
             this.effectiveLateralCutOff = this.geometricLateralCutOff;
         end
@@ -442,6 +467,19 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
 
         end
         
+        function dij = allocateClusterDoseContainer(this,dij)
+            % allocate space for container used in CD calculation
+
+            % get MatLab Config instance for displaying warings
+            matRad_cfg = MatRad_Config.instance();
+            if isfield(this.machine.data,'clusterDose')
+                dij = this.allocateQuantityMatrixContainers(dij,{'mClusterDose'});         
+            else
+                matRad_cfg.dispWarning('Cluster Dose not available in the machine data. Cluster Dose will not be calculated.');
+            end
+
+        end
+
         function calcLateralParticleCutOff(this,cutOffLevel,stfElement)
             % matRad function to calculate a depth dependend lateral cutoff
             % for each pristine particle beam

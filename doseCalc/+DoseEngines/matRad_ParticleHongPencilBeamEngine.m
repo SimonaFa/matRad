@@ -20,7 +20,7 @@ classdef matRad_ParticleHongPencilBeamEngine < DoseEngines.matRad_ParticlePencil
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
     properties (Constant)
-           possibleRadiationModes = {'protons', 'carbon'}
+           possibleRadiationModes = {'protons', 'carbon', 'helium'}
            name = 'Particle Pencil-Beam';
     end
        
@@ -93,7 +93,11 @@ classdef matRad_ParticleHongPencilBeamEngine < DoseEngines.matRad_ParticlePencil
                         bixel.mSqrtBetaDose(mask)  = bixel.mSqrtBetaDose(mask) .* kernels.beta(mask);
                     end
                 end
-            end  
+            end
+
+            if this.calcClusterDose
+                bixel.mClusterDose = kernels.clusterDose;
+            end
         end
         
     end

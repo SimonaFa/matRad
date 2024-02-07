@@ -1,2 +1,8 @@
 MCsquare/bin/Materials/
 matRad_plotDifferentPlanSlices.m
+basedata/helium_Generic_Fluence_Cluster_Facchiano_15.11.2023_focusmod.mat
+basedata/protons_Generic_fluence_cluster_Facchiano_interp.mat
+doseCalc/+DoseEngines/matRad_DoseEngineParticlePB.m
+doseCalc/+DoseEngines/matRad_DoseEngineParticlePB.m
+doseCalc/+DoseEngines/matRad_DoseEngineParticlePB.m
+doseCalc/+DoseEngines/matRad_ParticlePencilBeamEngineAbstract.asv
