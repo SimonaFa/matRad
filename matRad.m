@@ -32,7 +32,7 @@ matRad_rc
 %load BOXPHANTOM_dominantCD.mat
 %load PROSTATE_new4_sim1.mat
 %load PROSTATE_new8_VIII.mat
-load BOXPHANTOM.mat
+%load BOXPHANTOM.mat
 
 % meta information for treatment plan
 

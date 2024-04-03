@@ -59,8 +59,15 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
                 end
             end
         end
-        
 
+        function set.clusterDoseIP(this,cdIP)
+            if ~ischar(cdIP) || ~any(strcmp(cdIP,{'N','F'}))
+                matRad_cfg = MatRad_Config.instance();
+                matRad_cfg.dispError('Wrong input Ionization parameter. Choose F or N.');
+            else
+                this.clusterDoseIP = cdIP;
+            end
+        end      
     end
 
     % Should be abstract methods but in order to satisfy the compatibility
@@ -204,7 +211,7 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
             % calculate particle dose for bixel k on ray j of beam i
             % convert from MeV cm^2/g per primary to Gy mm^2 per 1e6 primaries
             conversionFactor = 1.6021766208e-02;
-            
+
             %Find all values we need to interpolate
             X.Z = conversionFactor*baseData.Z;
             
@@ -237,14 +244,13 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
             end   
             
             % Cluster Dose
+            % calculate particle cluster dose for bixel k on ray j of beam i
+            % convert from mm^2/g per primary to mm^2/g per 1e6 primaries
+            conversionFactorCD = 10^6;
             if this.calcClusterDose
-                if strcmp(this.clusterDoseIP, 'F')
-                    X.clusterDose = baseData.clusterDose.Fk(this.clusterDoseK).cDVector';
-                elseif strcmp(this.clusterDoseIP, 'N')
-                    X.clusterDose = baseData.clusterDose.Nk(this.clusterDoseK).cDVector';
-                else
-                    error('Wrong input Ionization parameter. Choose F or N.');
-                end
+                cDoseIP = baseData.clusterDose.([this.clusterDoseIP 'k']);
+                X.clusterDose = cDoseIP(this.clusterDoseK).cDVector';
+                X.clusterDose = conversionFactorCD.*X.clusterDose;
             end
 
             X = structfun(@(v) matRad_interp1(depths,v,bixel.radDepths,'nearest'),X,'UniformOutput',false); %Extrapolate to zero?           
