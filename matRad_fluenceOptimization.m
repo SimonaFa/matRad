@@ -202,11 +202,12 @@ elseif (strcmp(pln.propOpt.bioOptimization,'LEMIV_effect') || strcmp(pln.propOpt
     
     
 else 
-    if ~isempty(dij.mClusterDose)
+    if isfield(dij, 'mClusterDose')
+        if ~isempty(dij.mClusterDose)
         
-        bixelWeight =  (doseTarget)/(mean(dij.mClusterDose{1}(V,:)*wOnes));
-        wInit       = wOnes * bixelWeight;
-        
+            bixelWeight =  (doseTarget)/(mean(dij.mClusterDose{1}(V,:)*wOnes));
+            wInit       = wOnes * bixelWeight;
+        end
     else
         
         bixelWeight =  (doseTarget)/(mean(dij.physicalDose{1}(V,:)*wOnes)); 

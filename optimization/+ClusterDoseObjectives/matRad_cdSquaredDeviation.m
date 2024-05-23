@@ -62,7 +62,7 @@ classdef matRad_cdSquaredDeviation < ClusterDoseObjectives.matRad_ClusterDoseObj
         function fClusterDose = computeClusterDoseObjectiveFunction(obj,clusterDose)
             % deviation : dose minus prefered dose
             %deviation = dose - obj.parameters{1};
-            deviation = (clusterDose - obj.parameters{1});
+            deviation = (clusterDose - obj.parameters{1});%./max(clusterDose);
             
             % claculate objective function
             fClusterDose = obj.penalty/numel(clusterDose) * (deviation'*deviation);
@@ -72,7 +72,7 @@ classdef matRad_cdSquaredDeviation < ClusterDoseObjectives.matRad_ClusterDoseObj
         function fClusterDoseGrad   = computeClusterDoseObjectiveGradient(obj,clusterDose)
             % deviation : Dose minus prefered dose
             % deviation = dose - obj.parameters{1};
-            deviation = (clusterDose - obj.parameters{1});
+            deviation = (clusterDose - obj.parameters{1});%./max(clusterDose);
             
             % calculate delta
             fClusterDoseGrad = 2 * obj.penalty/numel(clusterDose) * deviation;

@@ -28,7 +28,7 @@ matRad_rc
 %load BOXPHANTOM_mod_onlytarget.mat
 %load BOXPHANTOM_simultaneous4.mat
 %load BOXPHANTOM_new_sim1.mat
-%load PROSTATE.mat
+load PROSTATE_cd.mat
 %load BOXPHANTOM_dominantCD.mat
 %load PROSTATE_new4_sim1.mat
 %load PROSTATE_new8_VIII.mat
@@ -36,27 +36,29 @@ matRad_rc
 
 % meta information for treatment plan
 
-pln.radiationMode   = 'protons';     % either photons / protons / carbon%
-%pln.radiationMode    = 'helium';
+pln.radiationMode   = 'protons';
+%pln.radiationMode   = 'carbon';     % either photons / protons / carbon%
+%pln.radiationMode    = 'carbon';
 %pln.machine         = 'Generic';
 %pln.machine         = 'generic_TOPAS_clusterdose_draft';
-%pln.machine         = 'generic_cd_draft';
+%pln.machine         = 'generic _cd_draft';
 %pln.machine         = 'generic_TOPAS_500_cd';
 %pln.machine         = 'generic_TOPAS_cd';
-%pln.machine         = 'Generic_fluence_cluster_Facchiano';
+%pln.machine         = 'Generic_fluence_cluster_Facchiano_interp';
 
-pln.machine         = 'Generic_fluence_cluster_Facchiano_interp.mat';
+%pln.machine = 'Generic';
+pln.machine         = 'Generic_clusterDose';
 %pln.machine         = 'Generic_Fluence_Cluster_Facchiano_15.11.2023_focusmod';
 
 pln.numOfFractions  = 30;
 
 % beam geometry settings
 pln.propStf.bixelWidth      = 5; %1000 [mm] / also corresponds to lateral spot spacing for particles
-pln.propStf.gantryAngles    = [-90]; % [?]
-pln.propStf.couchAngles     = [0]; % [?]
+pln.propStf.gantryAngles    = [-90 90]; % [?]
+pln.propStf.couchAngles     = [0 0]; % [?]
 pln.propStf.numOfBeams      = numel(pln.propStf.gantryAngles);
 pln.propStf.isoCenter       = ones(pln.propStf.numOfBeams,1) * matRad_getIsoCenter(cst,ct,0);
-pln.propStf.longitudinalSpotSpacing = 5; %20;
+pln.propStf.longitudinalSpotSpacing = 3; %20;
 
 % dose calculation settings
 %pln.propDoseCalc.engine = 'none';

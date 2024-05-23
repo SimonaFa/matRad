@@ -191,7 +191,7 @@ classdef MatRad_Config < handle
             obj.propDoseCalc.defaultNumHistoriesDirect = 1e6;
             obj.propDoseCalc.defaultOutputMCvariance = true;
                         
-            obj.propOpt.defaultMaxIter = 2000;
+            obj.propOpt.defaultMaxIter = 10000;
             
             %deprecated monte carlo options
             obj.propMC.ompMC_defaultHistories = 1e6;

@@ -321,7 +321,7 @@ if handles.State == 2 || handles.State == 3
     handles.SelectedDisplayOptionIdx=1;
     %set(handles.popupDisplayOption,'String','mClusterDose');
     %handles.SelectedDisplayOption ='clusterDose';
-    %handles.SelectedDisplayOptionIdx=1;
+    %handles.SelectedDisplayOptionIdx=2;
 else
     handles.resultGUI = [];
     set(handles.popupDisplayOption,'String','no option available');
@@ -976,7 +976,7 @@ if exist('Result','var')
                 elseif strfind(DispInfo{i,1},'LET')
                     DispInfo{i,3} = '[keV/um]';
                 elseif strfind(DispInfo{i,1}, 'clusterDose')
-                    DispInfo{i,3} = '[10^{18} ionizations / kg]';
+                    DispInfo{i,3} = '[clusters / kg]'; % Check units
                 else
                     DispInfo{i,3} = '[a.u.]';
                 end
@@ -1212,14 +1212,16 @@ if get(handles.popupTypeOfPlot,'Value') == 2 && exist('Result','var')
     % plot physical dose
     Content = get(handles.popupDisplayOption,'String');
     SelectedCube = Content{get(handles.popupDisplayOption,'Value')};
-    if sum(strcmp(SelectedCube,{'physicalDose','effect','RBExDose','alpha','beta','RBE'})) > 0
+    if sum(strcmp(SelectedCube,{'physicalDose','effect','RBExDose','alpha','beta','RBE', 'clusterDose'})) > 0
          Suffix = '';
     else
         Idx    = find(SelectedCube == '_');
         Suffix = SelectedCube(Idx:end);
     end
     
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% modification %%%%%%%%%%%%%%%%%%%%%%%%%
     mPhysDose = Result.(['physicalDose' Suffix]); 
+    %mPhysDose = Result.([SelectedCube Suffix]); 
     PlotHandles{1} = plot(handles.axesFig,vX,mPhysDose(ix),'color',cColor{1,1},'LineWidth',3); hold on; 
     PlotHandles{1,2} ='physicalDose';
     ylabel(handles.axesFig,'dose in [Gy]');
@@ -1275,7 +1277,24 @@ if get(handles.popupTypeOfPlot,'Value') == 2 && exist('Result','var')
         set(ax,'FontSize',18);
         Cnt=Cnt+2;
     end
-       
+
+    % plot clusterDose
+    %
+    %if contains(SelectedCube, 'clusterDose')
+    if isfield(Result,['clusterDose' Suffix]) && strcmp(SelectedCube, ['clusterDose' Suffix])
+        for i=1:1:size(DispInfo,1)
+            if DispInfo{i,2} && strcmp(DispInfo{i,1}, ['clusterDose' Suffix])
+                mclustDose = Result.(['clusterDose' Suffix]);
+                PlotHandles{Cnt, 1} = plot(handles.axesFig, vX, mclustDose(ix), 'color', cColor{1,1}, 'LineWidth', 3); hold on;
+                PlotHandles{Cnt, 2} = DispInfo{i,1};
+                ylabel(handles.axesFig,'[clusters / kg]');
+                set(handles.axesFig,'FontSize',defaultFontSize);
+                Cnt = Cnt + 1;
+            end
+        end
+    end
+    %
+
     % asses target coordinates 
     tmpPrior = intmax;
     tmpSize = 0;
@@ -1314,6 +1333,20 @@ if get(handles.popupTypeOfPlot,'Value') == 2 && exist('Result','var')
     
    Lines  = PlotHandles(~cellfun(@isempty,PlotHandles(:,1)),1);
    Labels = PlotHandles(~cellfun(@isempty,PlotHandles(:,1)),2);
+   %%%%%%%%%%%%% modification %%%%%%%%%%%%%%%%%%%%%%%
+   tmpLines = [];
+   tmpLabels = [];
+   for itemIdx = 1:length(Lines)
+       if strcmp(Labels(itemIdx), SelectedCube)
+           tmpLines{length(tmpLines) + 1, 1} = Lines{itemIdx};
+           tmpLabels{length(tmpLabels) + 1, 1} = Labels{itemIdx};
+       elseif contains(Labels(itemIdx), 'OuterTarget')
+           tmpLines{length(tmpLines) + 1, 1} = Lines{itemIdx};
+           tmpLabels{length(tmpLabels) + 1, 1} = Labels{itemIdx};
+       end
+   end
+   Lines = tmpLines;
+   Labels = tmpLabels;
    h=legend(handles.axesFig,[Lines{:}],Labels{:});
    set(h,'FontSize',defaultFontSize);
    xlabel('radiological depth [mm]','FontSize',18);  
