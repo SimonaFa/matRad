@@ -1,2 +1,15 @@
 MCsquare/bin/Materials/
 topas/MCrun
+basedata/carbon_Generic_clusterDose.mat
+basedata/helium_Generic_clusterDose.mat
+basedata/protons_Generic_clusterDose.mat
+doseCalc/+DoseEngines/matRad_ParticleHongPencilBeamEngine.asv
+doseCalc/+DoseEngines/matRad_ParticlePencilBeamEngineAbstract.asv
+matRad.asv
+matRad_plotDifferentPlanSlices.m
+phantoms/BOXPHANTOM_simultaneous4.mat
+phantoms/PROSTATE_cd.mat
+basedata/helium_Generic_Fluence_Cluster_Facchiano_15.11.2023_focusmod.mat
+basedata/interpSigma.m
+basedata/protons_Generic_fluence_cluster_Facchiano_interp.mat
+basedata/weightHelium.mat
