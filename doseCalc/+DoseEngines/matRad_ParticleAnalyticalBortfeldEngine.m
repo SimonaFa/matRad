@@ -22,6 +22,7 @@ classdef matRad_ParticleAnalyticalBortfeldEngine < DoseEngines.matRad_ParticlePe
     properties (Constant)
         possibleRadiationModes = {'protons'}
         name = 'Analytical Bortfeld Pencil-Beam';
+        shortName = 'AnalyticalPB';
     end
 
     properties (SetAccess = public, GetAccess = public)
@@ -61,6 +62,10 @@ classdef matRad_ParticleAnalyticalBortfeldEngine < DoseEngines.matRad_ParticlePe
             % input
             %   pln:                        matRad plan meta information struct
 
+            if nargin < 1
+                pln = [];
+            end
+
             this = this@DoseEngines.matRad_ParticlePencilBeamEngineAbstract(pln);
             
             this.calcLET = false;
@@ -68,7 +73,7 @@ classdef matRad_ParticleAnalyticalBortfeldEngine < DoseEngines.matRad_ParticlePe
     end
 
     methods (Access = protected)
-        function [dij,ct,cst,stf] = calcDoseInit(this,ct,cst,stf)
+        function dij = initDoseCalc(this,ct,cst,stf)
            
             if this.calcLET == true
                 matRad_cfg.dispWarning('Engine does not support LET calculation! Disabling!');
@@ -80,7 +85,7 @@ classdef matRad_ParticleAnalyticalBortfeldEngine < DoseEngines.matRad_ParticlePe
                 this.calcBioDose = false;
             end
             
-            [dij,ct,cst,stf] = this.calcDoseInit@DoseEngines.matRad_ParticlePencilBeamEngineAbstract(ct,cst,stf);
+            dij = this.initDoseCalc@DoseEngines.matRad_ParticlePencilBeamEngineAbstract(ct,cst,stf);
         end
 
         function chooseLateralModel(this)
@@ -91,7 +96,8 @@ classdef matRad_ParticleAnalyticalBortfeldEngine < DoseEngines.matRad_ParticlePe
             elseif ~strcmp(this.lateralModel,'single') 
                 matRad_cfg.dispWarning('Engine only supports analytically computed singleGaussian lateral Model!');
                 this.lateralModel = 'single';
-            end              
+            end   
+            matRad_cfg = MatRad_Config.instance();
 
             matRad_cfg.dispInfo('Using an analytically computed %s Gaussian pencil-beam kernel model!\n');
         end
@@ -126,26 +132,26 @@ classdef matRad_ParticleAnalyticalBortfeldEngine < DoseEngines.matRad_ParticlePe
         function X = interpolateKernelsInDepth(this,bixel)
             baseData = bixel.baseData;
             
-            radDepthOffset = bixel.radDepthOffset;
-            
-            if isfield(baseData,'offset')
-                radDepthOffset = radDepthOffset - baseData.offset;
-            end
-           
             % calculate particle dose for bixel k on ray j of beam i
             % convert from MeV cm^2/g per primary to Gy mm^2 per 1e6 primaries
             conversionFactor = 1.6021766208e-02;
+                       
+            radDepthOffset = bixel.radDepthOffset;
             
-            energyMean = baseData.energy;
-            energySpread = baseData.energy * this.sigmaEnergy;
-
             if isfield(baseData,'energySpectrum')
                 energyMean      = baseData.energySpectrum.mean;
                 energySpread    = baseData.energySpectrum.sigma/100 * baseData.energySpectrum.mean;
+            else
+                energyMean = baseData.energy;
+                energySpread = baseData.energy * this.sigmaEnergy;
             end
+
+            if isfield(baseData,'offset') && ~isfield(baseData,'energySpectrum')
+                radDepthOffset = radDepthOffset - baseData.offset;
+            end            
             
             X.Z = conversionFactor * this.calcAnalyticalBragg(energyMean, bixel.radDepths + radDepthOffset, energySpread);
-            X.sigma = this.calcSigmaLatMCS(bixel.radDepths, baseData.energy);
+            X.sigma = this.calcSigmaLatMCS(bixel.radDepths + radDepthOffset, baseData.energy);
         end
 
         function bixel = calcParticleBixel(this,bixel)
@@ -314,11 +320,16 @@ classdef matRad_ParticleAnalyticalBortfeldEngine < DoseEngines.matRad_ParticlePe
         end
         
         function calcLateralParticleCutOff(this,cutOffLevel,~)
+            calcRange = false;
+            if ~isfield(this.machine.data,'range')
+                calcRange = true;
+            end
+
             for i = 1:numel(this.machine.data)
                 this.machine.data(i).LatCutOff.CompFac = 1-cutOffLevel;
                 this.machine.data(i).LatCutOff.numSig  = sqrt(2) * sqrt(gammaincinv(0.995,1)); %For a 2D symmetric gaussian we need the inverse of the incomplete Gamma function for defining the CutOff
                 this.machine.data(i).LatCutOff.maxSigmaIni = max([this.machine.data(i).initFocus(:).SisFWHMAtIso]) ./ 2.3548;
-                if ~isfield(this.machine.data(i),'range')
+                if calcRange
                     this.machine.data(i).range = 10 * this.alpha*this.machine.data(i).energy.^this.p;
                 end
                 this.machine.data(i).LatCutOff.CutOff = this.machine.data(i).LatCutOff.numSig * sqrt(this.machine.data(i).LatCutOff.maxSigmaIni^2 + this.calcSigmaLatMCS(this.machine.data(i).range,this.machine.data(i).energy)^2);

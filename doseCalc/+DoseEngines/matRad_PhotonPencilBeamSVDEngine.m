@@ -23,6 +23,8 @@ classdef matRad_PhotonPencilBeamSVDEngine < DoseEngines.matRad_PencilBeamEngineA
     properties (Constant)
         possibleRadiationModes = {'photons'}; %constant which represent available radiation modes
         name = 'SVD Pencil Beam';
+        shortName = 'SVDPB';
+        
         %supportedQuantities = {'physicalDose'};
 
         % Define function_Di for beamlet calculation. Constant for use in
@@ -38,7 +40,7 @@ classdef matRad_PhotonPencilBeamSVDEngine < DoseEngines.matRad_PencilBeamEngineA
         intConvResolution = 0.5;        %resolution for kernel convolution [mm]
 
         enableDijSampling = true;
-        dijSampling;             %struct with lateral dij sampling parameters
+        dijSampling;                    %struct with lateral dij sampling parameters
     end
 
     %Calculation variables
@@ -75,18 +77,22 @@ classdef matRad_PhotonPencilBeamSVDEngine < DoseEngines.matRad_PencilBeamEngineA
             % Constructor
             %
             % call
-            %   engine = DoseEngines.matRad_PhotonPencilBeamSVDEngine(ct,stf,pln,cst)
+            %   engine = DoseEngines.matRad_PhotonPencilBeamSVDEngine(pln)
             %
             % input
             %   ct:                         matRad ct struct
             %   stf:                        matRad steering information struct
             %   pln:                        matRad plan meta information struct
             %   cst:                        matRad cst struct
+            
+            if nargin < 1
+                pln = [];
+            end
 
             % create this from superclass
             this = this@DoseEngines.matRad_PencilBeamEngineAbstract(pln);            
 
-            if nargin > 0
+            if nargin > 0 && isfield(pln,'propStf') && isfield(pln.propStf,'bixelWidth')
                 % 0 if field calc is bixel based, 1 if dose calc is field based
                 % num2str is only used to prevent failure of strcmp when bixelWidth
                 % contains a number and not a string
@@ -112,7 +118,7 @@ classdef matRad_PhotonPencilBeamSVDEngine < DoseEngines.matRad_PencilBeamEngineA
 
     methods (Access = protected)
 
-        function [dij,ct,cst,stf] = calcDoseInit(this,ct,cst,stf)
+        function dij = initDoseCalc(this,ct,cst,stf)
             %% Assign parameters
             matRad_cfg = MatRad_Config.instance();
 
@@ -122,7 +128,7 @@ classdef matRad_PhotonPencilBeamSVDEngine < DoseEngines.matRad_PencilBeamEngineA
             this.isFieldBasedDoseCalc = any(arrayfun(@(s) strcmp(num2str(s.bixelWidth),'field'),stf));
 
             %% Call Superclass init
-            [dij,ct,cst,stf] = calcDoseInit@DoseEngines.matRad_PencilBeamEngineAbstract(this,ct,cst,stf);
+            dij = initDoseCalc@DoseEngines.matRad_PencilBeamEngineAbstract(this,ct,cst,stf);
 
             %% Validate some properties
             % gaussian filter to model penumbra from (measured) machine output / see
@@ -241,16 +247,13 @@ classdef matRad_PhotonPencilBeamSVDEngine < DoseEngines.matRad_PencilBeamEngineA
 
             currBeam = initBeam@DoseEngines.matRad_PencilBeamEngineAbstract(this,currBeam,ct,cst,stf,i);
             
-            currBeam.ixRadDepths = find( ~isnan(currBeam.radDepthVdoseGrid{1}));
-            currBeam.rot_coordsVdoseGrid = currBeam.rot_coordsVdoseGrid(currBeam.ixRadDepths,:);
-
             matRad_cfg = MatRad_Config.instance();
 
             % get index of central ray or closest to the central ray
-            [~,center] = min(sum(reshape([stf(i).ray.rayPos_bev],3,[]).^2));
+            [~,center] = min(sum(reshape([currBeam.ray.rayPos_bev],3,[]).^2));
 
             % get correct kernel for given SSD at central ray (nearest neighbor approximation)
-            [~,currSSDix] = min(abs([this.machine.data.kernel.SSD]-stf(i).ray(center).SSD));
+            [~,currSSDix] = min(abs([this.machine.data.kernel.SSD]-currBeam.ray(center).SSD));
             % Display console message.
             matRad_cfg.dispInfo('\tSSD = %g mm ...\n',this.machine.data.kernel(currSSDix).SSD);
 
@@ -450,6 +453,8 @@ classdef matRad_PhotonPencilBeamSVDEngine < DoseEngines.matRad_PencilBeamEngineA
                 % overwrite field opening if necessary
                 if this.isFieldBasedDoseCalc
                     F = ray.shape;
+                else
+                    F = this.Fpre;
                 end
 
                 % prepare primary fluence array
@@ -470,7 +475,7 @@ classdef matRad_PhotonPencilBeamSVDEngine < DoseEngines.matRad_PencilBeamEngineA
                 ray.interpKernels = this.interpKernelCache;
             end
 
-            ray.geoDepths = currBeam.geoDistVdoseGrid{1}(ray.ix);
+            
         end    
     end
 

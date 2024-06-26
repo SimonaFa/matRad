@@ -23,6 +23,11 @@ classdef (Abstract) matRad_ClusterDoseObjective < matRad_ClusterDoseOptimization
         penalty             %Optimization penalty
     end
     
+    methods (Static)
+        function rob = availableRobustness()
+            rob = {'none'}; %By default, no robustness is available
+        end 
+    end
     %These should be abstract methods, however Octave can't parse them. As soon
     %as Octave is able to do this, they should be made abstract again
     methods %(Abstract)

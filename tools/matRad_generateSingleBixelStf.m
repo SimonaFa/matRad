@@ -53,7 +53,8 @@ catch
    matRad_cfg.dispError('Could not find the following machine file: %s',fileName); 
 end
 
-if strcmp(pln.radiationMode,'protons') || strcmp(pln.radiationMode,'carbon')
+if strcmp(pln.radiationMode,'protons') || strcmp(pln.radiationMode,'carbon') || strcmp(pln.radiationMode,'helium')
+
       
     availableEnergies = [machine.data.energy];
     availablePeakPos  = [machine.data.peakPos] + [machine.data.offset];
@@ -159,7 +160,8 @@ for i = 1:length(pln.propStf.gantryAngles)
     
     
     % find appropriate energies for particles
-    if strcmp(stf(i).radiationMode,'protons') || strcmp(stf(i).radiationMode,'carbon')
+    if strcmp(stf(i).radiationMode,'protons') || strcmp(stf(i).radiationMode,'carbon') || strcmp(stf(i).radiationMode,'helium')
+
         stf.longitudinalSpotSpacing = longitudinalSpotSpacing;
               
         % ray tracing necessary to determine depth of the target
@@ -180,8 +182,14 @@ for i = 1:length(pln.propStf.gantryAngles)
             radDepths = cumsum(l .* rho{1});
             
             % find target entry & exit
-            diff_voi    = diff([rho{2}]);
-            targetEntry = radDepths(diff_voi == 1);
+
+            diff_voi    = diff([rho{2}]);  
+            if rho{2}(1) > 0
+                targetEntry = 1;
+            else
+                targetEntry = radDepths(diff_voi == 1);
+            end
+            
             targetExit  = radDepths(diff_voi == -1);
             
             if numel(targetEntry) ~= numel(targetExit)
@@ -237,4 +245,5 @@ for i = 1:length(pln.propStf.gantryAngles)
     else
         matRad_cfg.dispError('Error generating stf struct: invalid radiation modality.');
     end
+
 end    

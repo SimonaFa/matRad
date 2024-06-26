@@ -110,46 +110,9 @@ classdef matRad_ViewingWidget < matRad_Widget
                     this.zoomHandle = zoom(this.widgetHandle);
                 end
             end
-            this.update();
+            this.initialize();
         end
-        
-        function this=initialize(this)
-%             updateIsoDoseLineCache(this);
-            %update(this);
-             
-        end
-        
-        function this=update(this,evt)
-            if ~this.lockUpdate
-            
-                doUpdate = false;
-                if nargin == 2
-                    %At pln changes and at cst/cst (for Isocenter and new settings) 
-                    %we need to update
-                    doUpdate = this.checkUpdateNecessary({'pln','ct','cst','resultGUI'},evt);
-                end
-            
-                if ~doUpdate || this.checkUpdateNecessary({'pln','ct','resultGUI'},evt)
-                   this.initValues();
-                end
-                            
-                this.updateValues();
-                this.updateIsoDoseLineCache(); 
-                % Update plot only if there are changes to ct, resultGUI.
-                % for matRad Gui startup/ intializing viewing widget
-                %  evt does not exist, then catch segment 
-           
-                try
-                    if  this.checkUpdateNecessary({'ct','resultGUI'},evt)
-                        this.UpdatePlot();
-                    end
-                catch
-                    this.UpdatePlot();
-                end
-            end
-            
-        end
-        
+                        
         function notifyPlotUpdated(obj)
             % handle environment
             matRad_cfg = MatRad_Config.instance();
@@ -362,19 +325,25 @@ classdef matRad_ViewingWidget < matRad_Widget
                 'XTickLabel',{  '0'; '0.1'; '0.2'; '0.3'; '0.4'; '0.5'; '0.6'; '0.7'; '0.8'; '0.9'; '1' },...
                 'YTick',[0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1],...
                 'YTickLabel',{  '0'; '0.1'; '0.2'; '0.3'; '0.4'; '0.5'; '0.6'; '0.7'; '0.8'; '0.9'; '1' },...
+                'Units','normalized',...
                 'Position',[0.0718390804597701 0.0654391371340524 0.902298850574712 0.899121725731895],...
                  'Tag','axesFig'); 
                  
             %Title
             h90 = get(h89,'title');
             
-            set(h90,...
+            set(h90, ...
                 'Parent',h89,...
+                'Visible','on',...
                 'Units','data',...
+                'Position',[0.500000554441759 1.00453467465753 0.5],...
+                'PositionMode','auto', ...
+                'Margin',2,...
+                'Clipping','off',...
                 'FontUnits','points',...
                 'Color',[0 0 0],...
-                'Position',[0.500000554441759 1.00453467465753 0.5],...
-                'PositionMode','auto',...
+                'BackgroundColor','none',...
+                'EdgeColor','none',...
                 'Interpreter','tex',...
                 'Rotation',0,...
                 'RotationMode','auto',...
@@ -385,22 +354,14 @@ classdef matRad_ViewingWidget < matRad_Widget
                 'HorizontalAlignment','center',...
                 'HorizontalAlignmentMode','auto',...
                 'VerticalAlignment','bottom',...
-                'VerticalAlignmentMode','auto',...
-                'EdgeColor','none',...
+                'VerticalAlignmentMode','auto', ...
                 'LineStyle','-',...
                 'LineWidth',0.5,...
-                'BackgroundColor','none',...
-                'Margin',2,...
-                'Clipping','off',...
-                'XLimInclude','on',...
-                'YLimInclude','on',...
-                'ZLimInclude','on',...
-                'Visible','on',...
                 'HandleVisibility','off',...
                 'BusyAction','queue',...
                 'Interruptible','on',...
                 'HitTest','on');
-                
+
             %X Label
             h91 = get(h89,'xlabel');
             
@@ -428,9 +389,6 @@ classdef matRad_ViewingWidget < matRad_Widget
                 'BackgroundColor','none',...
                 'Margin',3,...
                 'Clipping','off',...
-                'XLimInclude','on',...
-                'YLimInclude','on',...
-                'ZLimInclude','on',...
                 'Visible','on',...
                 'HandleVisibility','off',...
                 'BusyAction','queue',...
@@ -464,9 +422,6 @@ classdef matRad_ViewingWidget < matRad_Widget
                 'BackgroundColor','none',...
                 'Margin',3,...
                 'Clipping','off',...
-                'XLimInclude','on',...
-                'YLimInclude','on',...
-                'ZLimInclude','on',...
                 'Visible','on',...
                 'HandleVisibility','off',...
                 'BusyAction','queue',...
@@ -500,9 +455,6 @@ classdef matRad_ViewingWidget < matRad_Widget
                 'BackgroundColor','none',...
                 'Margin',3,...
                 'Clipping','off',...
-                'XLimInclude','on',...
-                'YLimInclude','on',...
-                'ZLimInclude','on',...
                 'Visible','off',...
                 'HandleVisibility','off',...
                 'BusyAction','queue',...
@@ -510,6 +462,33 @@ classdef matRad_ViewingWidget < matRad_Widget
                 'HitTest','on');           
             
             this.createHandles();
+            
+        end
+    
+        function this=doUpdate(this,evt)
+            if ~this.lockUpdate
+            
+                doUpdate = false;
+                if nargin == 2
+                    %At pln changes and at cst/cst (for Isocenter and new settings) 
+                    %we need to update
+                    doUpdate = this.checkUpdateNecessary({'pln_display','ct','cst','resultGUI'},evt);
+                end
+            
+                if ~doUpdate || this.checkUpdateNecessary({'pln','ct','resultGUI'},evt)
+                   this.initValues();
+                end
+                            
+                this.updateValues();
+                this.updateIsoDoseLineCache(); 
+                % Update plot only if there are changes to ct, resultGUI and cst structures.
+                % or on initialization
+           
+                if  doUpdate || nargin == 1
+                    this.UpdatePlot();
+                end
+             
+            end
             
         end
     end
@@ -705,7 +684,7 @@ classdef matRad_ViewingWidget < matRad_Widget
                     load(fileName);
                     SAD = machine.meta.SAD;
                 catch
-                    error(['Could not find the following machine file: ' fileName ]);
+                    this.showError(['Could not find the following machine file: ' fileName ]);
                 end
                 
                 % clear view and initialize some values
@@ -1125,8 +1104,16 @@ classdef matRad_ViewingWidget < matRad_Widget
                 
                 if isfield(ct, 'cubeHU')
                     minMax = [min(ct.cubeHU{1}(:)) max(ct.cubeHU{1}(:))];
+
+                    if diff(minMax) == 0
+                        minMax = [-1000 2000];
+                    end
                 else
                     minMax = [min(ct.cube{1}(:)) max(ct.cube{1}(:))];
+
+                    if diff(minMax) == 0
+                        minMax = [0 2];
+                    end
                 end
                 
                 if evalin('base','exist(''resultGUI'')')
@@ -1157,6 +1144,8 @@ classdef matRad_ViewingWidget < matRad_Widget
                                 this.DispInfo{i,3} = '[Gy(RBE)]';
                             elseif strfind(this.DispInfo{i,1},'LET')
                                 this.DispInfo{i,3} = '[keV/um]';
+                            elseif strfind(this.DispInfo{i,1}, 'clusterDose')
+                                this.DispInfo{i,3} = '[10^{18} ionizations / kg]';
                             else
                                 this.DispInfo{i,3} = '[a.u.]';
                             end
@@ -1167,10 +1156,19 @@ classdef matRad_ViewingWidget < matRad_Widget
                     
                     this.SelectedDisplayAllOptions=fieldnames(Result);                    
                     
-                    if strcmp(pln.radiationMode,'carbon') || (strcmp(pln.radiationMode,'protons') && strcmp(pln.propOpt.bioOptimization,'const_RBExD'))
-                        this.SelectedDisplayOption = 'RBExDose';
-                    else
-                        this.SelectedDisplayOption = 'physicalDose';
+%                     if strcmp(pln.radiationMode,'carbon') || strcmp(pln.bioParam.quantityOpt,'RBExD') 
+%                         this.SelectedDisplayOption = 'RBExDose';
+%                     else
+%                         this.SelectedDisplayOption = 'physicalDose';
+%                     end
+
+                    switch pln.bioParam.quantityOpt
+                        case 'physicalDose'
+                            this.SelectedDisplayOption = 'physicalDose';
+                        case 'RBExD'
+                            this.SelectedDisplayOption = 'RBExDose';
+                        case 'effect'
+                            this.SelectedDisplayOption = 'effect';
                     end
                     
                     if sum(strcmp(this.SelectedDisplayOption,fieldnames(Result))) == 0
@@ -1242,7 +1240,7 @@ classdef matRad_ViewingWidget < matRad_Widget
                                    
             if evalin('base','exist(''ct'')') && evalin('base','exist(''cst'')') &&  evalin('base','exist(''pln'')')
                 % update slice, beam and offset sliders parameters
-                pln= evalin('base','pln');
+                pln = evalin('base','pln');
                 ct = evalin('base','ct');
                 cst = evalin('base','cst');
                 this.cst = cst;
@@ -1283,12 +1281,12 @@ classdef matRad_ViewingWidget < matRad_Widget
                     dose = Result.(this.SelectedDisplayOption);
                     
                     %if the workspace has changed update the display parameters
+                    upperMargin = 1;
                     if  isempty(this.dispWindow{2,1}) || ~this.lockColorSettings
                         this.dispWindow{2,1} = [min(dose(:)) max(dose(:))]; % set default dose range
                         this.dispWindow{2,2} = [min(dose(:)) max(dose(:))]; % set min max values
                         
                         % if upper colorrange is defined then use it otherwise 120% iso dose
-                        upperMargin = 1;
                         if abs((max(dose(:)) - this.dispWindow{2,1}(1,2))) < 0.01  * max(dose(:))
                             upperMargin = 1.2;
                         end

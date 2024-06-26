@@ -32,7 +32,7 @@ function dij = matRad_calcPhotonDoseMC(ct,stf,pln,cst,nCasePerBixel,visBool)
 
 matRad_cfg =  MatRad_Config.instance();
 
-matRad_cfg.dispDeprecationWarning('The old dose calculation functions are deprecated! Try to use matRad_calcDose with the new engine format from now on!');
+matRad_cfg.dispDeprecationWarning('The old dose calculation functions are deprecated! Try to use matRad_calcDoseInfluence with the new engine format from now on!');
 
 % could be also set as pln property e.g pln.propDoseCalc.useDeprecated
 if isfield(pln, 'propDoseCalc') && isfield(pln.propDoseCalc, 'engine')
@@ -58,5 +58,5 @@ matRad_cfg.dispInfo('Starting dose calculation using %s engine.\n', engine.name)
 pln.propDoseCalc = engine;
 
 % call the calcDose from engine
-dij = matRad_calcDose(ct,cst,stf,pln);
+dij = matRad_calcDoseInfluence(ct,cst,stf,pln);
 end

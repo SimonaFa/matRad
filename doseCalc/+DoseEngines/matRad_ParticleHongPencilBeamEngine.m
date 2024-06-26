@@ -20,8 +20,10 @@ classdef matRad_ParticleHongPencilBeamEngine < DoseEngines.matRad_ParticlePencil
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
     properties (Constant)
-           possibleRadiationModes = {'protons', 'carbon', 'helium'}
-           name = 'Particle Pencil-Beam';
+           possibleRadiationModes = {'protons', 'helium','carbon'}
+           name = 'Hong Particle Pencil-Beam';
+           shortName = 'HongPB';
+
     end
        
     methods 
@@ -34,6 +36,10 @@ classdef matRad_ParticleHongPencilBeamEngine < DoseEngines.matRad_ParticlePencil
             %
             % input
             %   pln:                        matRad plan meta information struct
+
+            if nargin < 1
+                pln = [];
+            end
              
             this = this@DoseEngines.matRad_ParticlePencilBeamEngineAbstract(pln);
         end
@@ -81,6 +87,7 @@ classdef matRad_ParticleHongPencilBeamEngine < DoseEngines.matRad_ParticlePencil
                 bixel.mLETDose = bixel.physicalDose.*kernels.LET;
             end
             
+%{
             if this.calcBioDose
                 bixel.mAlphaDose = bixel.physicalDose;
                 bixel.mSqrtBetaDose = bixel.physicalDose;
@@ -94,6 +101,13 @@ classdef matRad_ParticleHongPencilBeamEngine < DoseEngines.matRad_ParticlePencil
                     end
                 end
             end
+%}
+            if this.calcBioDose                               
+                [bixelAlpha,bixelBeta] = this.bioParam.calcLQParameterForKernel(bixel,kernels);
+
+                bixel.mAlphaDose = bixel.physicalDose .* bixelAlpha;
+                bixel.mSqrtBetaDose = bixel.physicalDose .* sqrt(bixelBeta);
+            end  
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             gaussDist = @(r, s) exp( -r.^2 ./ (2*s.^2)) ./ (2*pi*s.^2);
             gaussDist3 = @(r, s1, s2, s3, w2, w3) (1 - w2 - w3) .* gaussDist(r, s1) + w2 .* gaussDist(r, s2) + w3 .* gaussDist(r, s3); 
@@ -166,6 +180,7 @@ classdef matRad_ParticleHongPencilBeamEngine < DoseEngines.matRad_ParticlePencil
                 end
                 bixel.mClusterDose = Lcd .* kernels.clusterDose;
             end
+
         end
         
     end

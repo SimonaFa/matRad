@@ -25,6 +25,10 @@ classdef (Abstract) matRad_ClusterDoseOptimizationFunction
     properties (Abstract, Access = public)
         parameters
     end
+
+    properties
+        robustness = 'none';    %Robustness setting -> may be removed from the DoseObjective class in a future release
+    end
     
     methods
         function obj = matRad_ClusterDoseOptimizationFunction(dataStruct)
@@ -96,6 +100,10 @@ classdef (Abstract) matRad_ClusterDoseOptimizationFunction
             catch ME
                 error(['Could not instantiate Optimization Function: ' ME.message]);
             end
+        end
+
+        function rob = availableRobustness()
+            rob = {'none'}; %By default, no robustness is available
         end
                 
         function s = convertOldOptimizationStruct(old_s)

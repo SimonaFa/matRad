@@ -23,42 +23,32 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
 
         calcLET = true;                 % Boolean which defines if LET should be calculated
         calcBioDose = false;            % Boolean which defines if biological dose calculation shoudl be performed (alpha*dose and sqrt(beta)*dose)
+
         calcClusterDose = true;         % Boolean which defines if Cluster Dose calculation should be performed
         clusterDoseIP = 'F';            % Choose the Ip for CD calculation
         clusterDoseK = 5;               % Choose index k for minimum cluster size
         calcClusterDoseFromFluence = true;
 
-        visBoolLateralCutOff = false;   % Boolean switch for visualization during+ LeteralCutOff calculation
-
+        airOffsetCorrection  = true;    % Corrects WEPL for SSD difference to kernel database
         lateralModel = 'auto';          % Lateral Model used. 'auto' uses the most accurate model available (i.e. multiple Gaussians). 'single','double','multi' try to force a singleGaussian or doubleGaussian model, if available
+
+        visBoolLateralCutOff = false;   % Boolean switch for visualization during+ LeteralCutOff calculation
     end
 
     properties (SetAccess = protected, GetAccess = public)
         constantRBE = NaN;              % constant RBE value
-
-        vTissueIndex;                   %Stores tissue indices available in the matRad base data
+        vTissueIndex;                   % Stores tissue indices available in the matRad base data
+        vAlphaX;                        % Stores Photon Alpha
+        vBetaX;                         % Stores Photon Beta
     end
 
     methods
         function this = matRad_ParticlePencilBeamEngineAbstract(pln)
-            this = this@DoseEngines.matRad_PencilBeamEngineAbstract(pln);
-
-            % check if bio optimization is needed and set the
-            % coresponding boolean accordingly
-            % TODO:
-            % This should not be handled here as an optimization property
-            % We should rather make optimization dependent on what we have
-            % decided to calculate here.
-            if nargin > 0 
-                if (isfield(pln,'propOpt')&& isfield(pln.propOpt,'bioOptimization')&& ...
-                    (isequal(pln.propOpt.bioOptimization,'LEMIV_effect') ||...
-                    isequal(pln.propOpt.bioOptimization,'LEMIV_RBExD')) && ...
-                    strcmp(pln.radiationMode,'carbon'))
-                this.calcBioDose = true;
-                elseif strcmp(pln.radiationMode,'protons') && isfield(pln,'propOpt') && isfield(pln.propOpt,'bioOptimization') && isequal(pln.propOpt.bioOptimization,'const_RBExD')
-                    this.constantRBE = 1.1;                    
-                end
+            if nargin < 1
+                pln = [];
             end
+
+            this = this@DoseEngines.matRad_PencilBeamEngineAbstract(pln);
         end
 
         function set.clusterDoseIP(this,cdIP)
@@ -76,7 +66,7 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
     % in the far future implements this feature this should be abstract again.
     methods (Access = protected) %Abstract
         function bixel = calcParticleBixel(this,bixel)
-            error('Function needs to be implemented!');
+           throw(MException('MATLAB:class:AbstractMember','Abstract function calcParticleBixel of your Particle PencilBeam DoseEngine needs to be implemented!'));
         end
     end
 
@@ -172,6 +162,8 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
             
             bixel.SSD = currRay.SSD;
 
+            bixel.radDepthOffset = currRay.radDepthOffset;
+
             % Compute initial spotWidth
             bixel.sigmaIniSq = currRay.sigmaIni(k).^2;
 
@@ -195,6 +187,8 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
             bixel.radDepths = currRay.radDepths(bixel.subRayIx);
             if this.calcBioDose
                 bixel.vTissueIndex = currRay.vTissueIndex(bixel.subRayIx);
+                bixel.vAlphaX      = currRay.vAlphaX(bixel.subRayIx);
+                bixel.vBetaX       = currRay.vBetaX(bixel.subRayIx);
             end
         
         end
@@ -239,7 +233,8 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
             end
 
             % bioDose
-            if this.calcBioDose
+            % TODO: Improve isfield check by better model management
+            if this.calcBioDose && strcmp(this.bioParam.model,'LEM')
                 X.alpha = baseData.alpha;
                 X.beta = baseData.beta;
             end   
@@ -326,14 +321,26 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
             lateralRayCutOff = this.getLateralDistanceFromDoseCutOffOnRay(ray);
 
             % Ray tracing for beam i and ray j
-            [ray.ix,ray.radialDist_sq] = this.calcGeoDists(currBeam.rot_coordsVdoseGrid, ...
+            [ix,radialDist_sq] = this.calcGeoDists(currBeam.bevCoords, ...
                 ray.sourcePoint_bev, ...
                 ray.targetPoint_bev, ...
                 ray.SAD, ...
-                currBeam.ixRadDepths, ...
+                currBeam.validCoordsAll, ...
                 lateralRayCutOff);
+
+            ray.validCoords = cellfun(@(beamIx) beamIx & ix,currBeam.validCoords,'UniformOutput',false);
+            ray.ix = cellfun(@(ixInGrid) this.VdoseGrid(ixInGrid),ray.validCoords,'UniformOutput',false);
             
-            ray.radDepths = currBeam.radDepthVdoseGrid{1}(ray.ix);
+            %subCoords = cellfun(@(beamIx) beamIx(ix),currBeam.validCoords,'UniformOutput',false);
+            %ray.radialDist_sq = cellfun(@(subix) radialDist_sq(subix),radialDist_sq,subCoords);
+            ray.radialDist_sq = cellfun(@(beamIx) radialDist_sq(beamIx(ix)),currBeam.validCoords,'UniformOutput',false);
+
+            ray.validCoordsAll = any(cell2mat(ray.validCoords),2);
+            
+            ray.geoDepths = cellfun(@(rD,ix) rD(ix),currBeam.geoDepths,ray.validCoords,'UniformOutput',false); %usually not needed for particle beams
+            ray.radDepths = cellfun(@(rD,ix) rD(ix),currBeam.radDepths,ray.validCoords,'UniformOutput',false);
+            %ray.ix = currBeam.ixRadDepths(ix);
+            %ray.subIxVdoseGrid = currBeam.subIxVdoseGrid(ix);
         end
 
         function [currBixel] = getBixelIndicesOnRay(this,currBixel,currRay)
@@ -380,8 +387,8 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
         end
 
         function currBixel = getBeamModifiers(this,currBixel)
-            radDepthOffset = 0;
             addSigmaSq = 0;
+            radDepthOffset = 0;
             % consider range shifter for protons if applicable
             if currBixel.rangeShifter.eqThickness > 0
                 %TODO: We should do this check in dose calc initialization
@@ -403,21 +410,46 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
             end
 
             currBixel.addSigmaSq = addSigmaSq;
-            currBixel.radDepthOffset = radDepthOffset;
+            currBixel.radDepthOffset = currBixel.radDepthOffset + radDepthOffset;
         end
         
-        function [dij,ct,cst,stf] = calcDoseInit(this,ct,cst,stf)
+        function dij = initDoseCalc(this,ct,cst,stf)
             % modified inherited method of the superclass DoseEngine,
             % containing intialization which are specificly needed for
             % pencil beam calculation and not for other engines
 
-            [dij,ct,cst,stf] = calcDoseInit@DoseEngines.matRad_PencilBeamEngineAbstract(this,ct,cst,stf);
+            dij = initDoseCalc@DoseEngines.matRad_PencilBeamEngineAbstract(this,ct,cst,stf);
             
+            matRad_cfg = MatRad_Config.instance();
+
             %Choose the lateral pencil beam model
             this.chooseLateralModel();
 
+            %Toggles correction of small difference of current SSD to distance used
+            %in generation of base data (e.g. phantom surface at isocenter)
+            if this.airOffsetCorrection
+                if ~isfield(this.machine.meta, 'fitAirOffset')
+                    this.machine.meta.fitAirOffset = 0; %By default we assume that the base data was fitted to a phantom with surface at isocenter
+                    matRad_cfg.dispDebug('Asked for correction of Base Data Air Offset, but no value found. Using default value of %f mm.\n',this.machine.meta.fitAirOffset);
+                end
+            else
+                this.machine.meta.fitAirOffset = 0;
+            end
+
+            if ~isfield(this.machine.meta, 'BAMStoIsoDist')
+                this.machine.meta.BAMStoIsoDist = 1000;
+                matRad_cfg.dispWarning('Machine data does not contain BAMStoIsoDist. Using default value of %f mm.',this.machine.meta.BAMStoIsoDist);
+            end
+            
+            %Biology
             if ~isnan(this.constantRBE)
                 dij.RBE = this.constantRBE;
+            end
+            
+            % TODO: this is clumsy and needs to be changed with the
+            % biomodel update
+            if this.bioParam.bioOpt
+                this.calcBioDose = true;
             end
 
             % Load biologicla base data if needed
@@ -464,59 +496,96 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
             minRaShi = min([raShis.eqThickness]);
             radDepthOffset = this.machine.data(maxEnergyIx).offset + minRaShi;
 
-            % limit rotated coordinates to positions where ray tracing is availabe
-            currBeam.ixRadDepths = find(currBeam.radDepthVdoseGrid{1} < (this.machine.data(maxEnergyIx).depths(end) - radDepthOffset));% & ~isnan(currBeam.radDepthVdoseGrid{1}));
-            
-            %currBeam.radDepthVdoseGrid{1} = currBeam.radDepthVdoseGrid{1}(currBeam.ixRadDepths);
-            currBeam.rot_coordsVdoseGrid = currBeam.rot_coordsVdoseGrid(currBeam.ixRadDepths,:);
+            % apply limit in depth
+            %subSelectIx = currBeam.radDepths{1} < (this.machine.data(maxEnergyIx).depths(end) - radDepthOffset);
+
+            subSelectIx = cellfun(@(rD) rD < (this.machine.data(maxEnergyIx).depths(end) - radDepthOffset),currBeam.radDepths,'UniformOutput',false);
+            currBeam.validCoords = cellfun(@and,subSelectIx,currBeam.validCoords,'UniformOutput',false);
+            currBeam.validCoordsAll = any(cell2mat(currBeam.validCoords),2);
+
+            %currBeam.ixRadDepths = currBeam.ixRadDepths(subSelectIx);
+            %currBeam.subIxVdoseGrid = currBeam.subIxVdoseGrid(subSelectIx);
+            %currBeam.radDepths = cellfun(@(rd) rd(subSelectIx),currBeam.radDepths,'UniformOutput',false);
+            %currBeam.bevCoords = currBeam.bevCoords(subSelectIx,:);
 
             %Precompute CutOff
-            this.calcLateralParticleCutOff(this.dosimetricLateralCutOff,stf(i));
+            this.calcLateralParticleCutOff(this.dosimetricLateralCutOff,currBeam);
         end
         
         function dij = loadBiologicalBaseData(this,cst,dij)
             matRad_cfg = MatRad_Config.instance();
-            if isfield(this.machine.data,'alphaX') && isfield(this.machine.data,'betaX')
-                matRad_cfg.dispInfo('matRad: loading biological base data... ');
-                this.vTissueIndex    = zeros(size(this.VdoseGrid,1),1);
-                dij.ax              = zeros(dij.doseGrid.numOfVoxels,1);
-                dij.bx              = zeros(dij.doseGrid.numOfVoxels,1);
 
-                cstDownsampled = matRad_setOverlapPriorities(cst);
+            matRad_cfg.dispInfo('Initializing biological dose calculation...\n');
+            
+            numOfCtScen = numel(this.VdoseGridScenIx);
 
-                % resizing cst to dose cube resolution
-                cstDownsampled = matRad_resizeCstToGrid(cstDownsampled,dij.ctGrid.x,dij.ctGrid.y,dij.ctGrid.z,...
-                    dij.doseGrid.x,dij.doseGrid.y,dij.doseGrid.z);
+
+            cstDownsampled = matRad_setOverlapPriorities(cst);
+
+            % resizing cst to dose cube resolution
+            cstDownsampled = matRad_resizeCstToGrid(cstDownsampled,dij.ctGrid.x,dij.ctGrid.y,dij.ctGrid.z,...
+                dij.doseGrid.x,dij.doseGrid.y,dij.doseGrid.z);
+            
+            tmpScenVdoseGrid = cell(numOfCtScen,1);
+
+            [dij.ax,dij.bx] = matRad_getPhotonLQMParameters(cstDownsampled,dij.doseGrid.numOfVoxels,this.VdoseGrid);  
+
+            for s = 1:numOfCtScen            
+                tmpScenVdoseGrid{s} = this.VdoseGrid(this.VdoseGridScenIx{s});
                 % retrieve photon LQM parameter for the current dose grid voxels
-                [dij.ax,dij.bx] = matRad_getPhotonLQMParameters(cstDownsampled,dij.doseGrid.numOfVoxels,1,this.VdoseGrid);
 
-                for i = 1:size(cstDownsampled,1)
-
-                    % check if cst is compatiable
-                    if ~isempty(cstDownsampled{i,5}) && isfield(cstDownsampled{i,5},'alphaX') && isfield(cstDownsampled{i,5},'betaX')
-
-                        % check if base data contains alphaX and betaX
-                        IdxTissue = find(ismember(this.machine.data(1).alphaX,cstDownsampled{i,5}.alphaX) & ...
-                            ismember(this.machine.data(1).betaX,cstDownsampled{i,5}.betaX));
-
-                        % check consitency of biological baseData and cst settings
-                        if ~isempty(IdxTissue)
-                            isInVdoseGrid = ismember(this.VdoseGrid,cstDownsampled{i,4}{1});
-                            this.vTissueIndex(isInVdoseGrid) = IdxTissue;
-                        else
-                            matRad_cfg.dispError('Biological base data and cst are inconsistent!');
-                        end
-
-                    else
-                        this.vTissueIndex(row) = 1;
-                        matRad_cfg.dispInfo('Tissue type of %s was set to 1\n',cstDownsampled{i,2});
-                    end
-                end
-                dij.vTissueIndex = this.vTissueIndex;
-                matRad_cfg.dispInfo('done.\n');
-            else
-                matRad_cfg.dispError('Base data is missing alphaX and/or betaX!');
+                % vAlphaX and vBetaX for parameters in VdoseGrid
+                this.vAlphaX{s}         = dij.ax{s}(tmpScenVdoseGrid{s});
+                this.vBetaX{s}          = dij.bx{s}(tmpScenVdoseGrid{s});
+                this.vTissueIndex{s}    = zeros(size(tmpScenVdoseGrid{s},1),1);
             end
+                   
+            if strcmp(this.bioParam.model,'LEM') 
+                matRad_cfg.dispInfo('\tUsing LEM model with precomputed kernels\n');                    
+
+                if isfield(this.machine.data,'alphaX') && isfield(this.machine.data,'betaX')
+                    for i = 1:size(cstDownsampled,1)
+
+                        % check if cst is compatiable
+                        if ~isempty(cstDownsampled{i,5}) && isfield(cstDownsampled{i,5},'alphaX') && isfield(cstDownsampled{i,5},'betaX')
+
+                            % check if base data contains alphaX and betaX
+                            IdxTissue = find(ismember(this.machine.data(1).alphaX,cstDownsampled{i,5}.alphaX) & ...
+                                ismember(this.machine.data(1).betaX,cstDownsampled{i,5}.betaX));
+
+                            % check consitency of biological baseData and cst settings
+                            if ~isempty(IdxTissue)
+                                for s = 1:numOfCtScen
+                                    tmpScenVdoseGrid = this.VdoseGrid(this.VdoseGridScenIx{s});
+                                    isInVdoseGrid = ismember(tmpScenVdoseGrid,cstDownsampled{i,4}{s});
+                                    this.vTissueIndex{s}(isInVdoseGrid) = IdxTissue;
+                                end
+                            else
+                                matRad_cfg.dispError('Biological base data and cst are inconsistent!');
+                            end
+
+                        else
+                            for s = 1:numOfCtScen
+                                this.vTissueIndex{s}(:) = 1;
+                            end
+                            matRad_cfg.dispWarning('\tTissue type of %s was set to 1\n',cstDownsampled{i,2});
+                        end
+                    end
+                    dij.vTissueIndex = this.vTissueIndex;
+                    matRad_cfg.dispInfo('done.\n');
+                else
+                    matRad_cfg.dispError('Base data is missing alphaX and/or betaX!');
+                end
+            elseif any(strcmp(this.bioParam.model,{'HEL','MCN','WED'}))
+                matRad_cfg.dispInfo('\tUsing LET-dependent model\n');
+                if ~this.calcLET
+                    matRad_cfg.dispWarning('Forcing LET calculation as it is required for LET-dependent models!');
+                    this.calcLET = true;
+                end
+            else
+                matRad_cfg.dispError('Unknown Biological Model!');
+            end
+
         end
 
         function dij = allocateBioDoseContainer(this,dij)
@@ -734,6 +803,8 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
                         bixel.sigmaIniSq = largestSigmaSq4uniqueEnergies(cnt);
                         bixel.radDepths = (depthValues(j) + baseData.offset) * ones(size(radialDist_sq));
                         bixel.vTissueIndex = ones(size(bixel.radDepths));
+                        bixel.vAlphaX      = 0.5*ones(size(bixel.radDepths));
+                        bixel.vBetaX      = 0.05*ones(size(bixel.radDepths));
                         bixel.subRayIx = true(size(bixel.radDepths));
                         bixel.ix = find(bixel.subRayIx);
                         bixel.radDepthOffset = 0;
@@ -950,14 +1021,43 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
             % calculate initial sigma for all bixel on current ray
             ray.sigmaIni = matRad_calcSigmaIni(this.machine.data,ray,ray.SSD);
             
+            % Since matRad's ray cast starts at the skin and base data
+            % is generated at soume source to phantom distance
+            % we can explicitly correct for the nozzle to air WEPL in
+            % the current case.
+            if this.airOffsetCorrection
+                nozzleToSkin = (ray.SSD + this.machine.meta.BAMStoIsoDist) - this.machine.meta.SAD;
+                ray.radDepthOffset = 0.0011 * (nozzleToSkin - this.machine.meta.fitAirOffset);
+            else
+                ray.radDepthOffset = 0;
+            end
+
             % just use tissue classes of voxels found by ray tracer
             if this.calcBioDose
-                ray.vTissueIndex = this.vTissueIndex(ray.ix,:);
+                for s = 1:numel(this.vTissueIndex)
+                    ray.vTissueIndex{s} = this.vTissueIndex{s}(ray.validCoords{s},:);
+                    ray.vAlphaX{s} = this.vAlphaX{s}(ray.validCoords{s});
+                    ray.vBetaX{s}  = this.vBetaX{s}(ray.validCoords{s});
+                end
             end
         end
 
-        function dij = fillDij(this,bixel,dij,stf,currBeamIdx,currRayIdx,currBixelIdx,bixelCounter)
-            dij = this.fillDij@DoseEngines.matRad_PencilBeamEngineAbstract(bixel,dij,stf,currBeamIdx,currRayIdx,currBixelIdx,bixelCounter);
+        function scenRay = extractSingleScenarioRay(this,ray,scenIdx)
+            scenRay = extractSingleScenarioRay@DoseEngines.matRad_PencilBeamEngineAbstract(this,ray,scenIdx);
+            
+            %Gets number of scenario
+            scenNum = this.multScen.scenNum(scenIdx);
+            ctScen = this.multScen.linearMask(scenNum,1);
+
+            if isfield(scenRay,'vTissueIndex')
+                scenRay.vTissueIndex = scenRay.vTissueIndex{ctScen};
+                scenRay.vAlphaX = scenRay.vAlphaX{ctScen};
+                scenRay.vBetaX = scenRay.vBetaX{ctScen};
+            end
+        end
+
+        function dij = fillDij(this,bixel,dij,stf,scenIdx,currBeamIdx,currRayIdx,currBixelIdx,bixelCounter)
+            dij = this.fillDij@DoseEngines.matRad_PencilBeamEngineAbstract(bixel,dij,stf,scenIdx,currBeamIdx,currRayIdx,currBixelIdx,bixelCounter);
             
             % Add MU information
             if ~this.calcDoseDirect
