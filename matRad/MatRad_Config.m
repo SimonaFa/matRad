@@ -204,18 +204,7 @@ classdef MatRad_Config < handle
             obj.defaults.propDoseCalc.fineSampling.N = 2;
             obj.defaults.propDoseCalc.fineSampling.method = 'fitCircle';
             %Monte Carlo options
-<<<<<<< HEAD:MatRad_Config.m
-            obj.propDoseCalc.defaultNumHistoriesPerBeamlet = 2e4;
-            obj.propDoseCalc.defaultNumHistoriesDirect = 1e6;
-            obj.propDoseCalc.defaultOutputMCvariance = true;
-                        
 
-            obj.propOpt.defaultMaxIter = 500;
-            obj.propOpt.defaultRunDAO = 0;
-            obj.propOpt.defaultRunSequencing = 0;
-            obj.propOpt.defaultClearUnusedVoxels = false;
-
-=======
             obj.defaults.propDoseCalc.numHistoriesPerBeamlet = 2e4;
             obj.defaults.propDoseCalc.numHistoriesDirect = 1e6;
             obj.defaults.propDoseCalc.outputMCvariance = true;
@@ -228,9 +217,6 @@ classdef MatRad_Config < handle
 
             %Sequencing Options
             obj.defaults.propSeq.sequencer = 'siochi';
->>>>>>> dev_varRBErobOpt:matRad/MatRad_Config.m
-            
-
 
             obj.disableGUI = false;
             

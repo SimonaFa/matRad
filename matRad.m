@@ -22,14 +22,14 @@ matRad_rc
 %load TG119.mat
 %load PROSTATE.mat
 %load LIVER.mat
-load BOXPHANTOM_simultaneous4.mat
-%load BOXPHANTOM.mat
+%load BOXPHANTOM_simultaneous4.mat
+load BOXPHANTOM.mat
 
 % meta information for treatment plan
 pln.numOfFractions  = 30;
 pln.radiationMode   = 'protons';           % either photons / protons / helium / carbon
-pln.machine         = 'Generic_clusterDose';
-%pln.machine = 'Generic';
+%pln.machine         = 'Generic_clusterDose';
+pln.machine = 'Generic';
 
 % beam geometry settings
 pln.propStf.bixelWidth      = 5; % [mm] / also corresponds to lateral spot spacing for particles
