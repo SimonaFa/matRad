@@ -31,11 +31,7 @@ function multScen = matRad_multScen(ct,scenarioModel)
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 matRad_cfg = MatRad_Config.instance();
-<<<<<<< HEAD:matRad_multScen.m
-matRad_cfg.dispWarning('The matRad_multScen function will be deprecated soon!\nCheck out the new Scenario Models in the scenarios folder.');
-=======
 %matRad_cfg.dispWarning('The matRad_multScen function will be deprecated soon!\nCheck out the new Scenario Models in the scenarios folder.');
->>>>>>> dev_varRBErobOpt:matRad/scenarios/matRad_multScen.m
 
 switch scenarioModel
     case 'nomScen'
