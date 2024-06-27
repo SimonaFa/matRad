@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 MCsquare/bin/Materials/
 topas/MCrun
 basedata/carbon_Generic_clusterDose.mat
@@ -14,3 +15,10 @@ basedata/interpSigma.m
 basedata/protons_Generic_fluence_cluster_Facchiano_interp.mat
 basedata/weightHelium.mat
 submodules/parfor_progress/
+=======
+thirdParty/MCsquare/bin/Materials/
+userdata/*
+testresults.xml
+coverage.xml
+coverage.json
+>>>>>>> dev_varRBErobOpt
