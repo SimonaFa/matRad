@@ -38,16 +38,19 @@ if ~isempty(obj.cst)
    obj = matRad_exportDicomRTStruct(obj);    
 end
 
-%if ~isempty(obj.pln)
-%    obj = matRad_exportDicomRTPlan(obj);
-%end
-
+%RT Dose Series (Before Plan to have dose reference ids)
 if ~isempty(obj.resultGUI)
     obj = matRad_exportDicomRTDoses(obj);
 end
 
-%Pln Series
+%RT Plan at the end
+if ~isempty(obj.pln) && ~isempty(obj.resultGUI)
+    if obj.enableRtPlanExport
+        obj = matRad_exportDicomRTPlan(obj);
+    else
+        matRad_cfg.dispWarning('pln and resultGUI objects provided, but exporting of RTPlan is disabled by default. Enable it with setting the property enableRtPlanExport to ''true'' before calling the export.');
+    end
+end
 
-%Dose Series
 end
 
