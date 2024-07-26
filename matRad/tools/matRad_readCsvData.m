@@ -14,8 +14,8 @@ if rem(size(dataTable,1),prod(cubeDim))==0
     % Save all scored quantities as cell array and reshape to cubeDim
     dataOut = cell(1,numOfReportQuantities);
     for i = 1:numOfReportQuantities
-        dataOut{i} = reshape(dataTable.(['Var' num2str(i+3)]),cubeDim(2),cubeDim(1),cubeDim(3));
-        dataOut{i} = permute(dataOut{i},[2 1 3]);
+        dataOut{i} = reshape(dataTable.(['Var' num2str(i+3)]),cubeDim(3),cubeDim(2),cubeDim(1));
+        dataOut{i} = permute(dataOut{i},[2 3 1]);
     end
 else
     matRad_cfg.dispError('bin data contains an odd number of entries.')

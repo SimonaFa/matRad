@@ -32,6 +32,9 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
         calcBioDose = false;
         prescribedDose = [];
 
+        calcClusterDose        
+        clusterDoseIP           
+        clusterDoseK               
 
         topasExecCommand; %Defaults will be set during construction according to TOPAS installation instructions and used system
 
@@ -96,10 +99,12 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
             'defaultModelProtons',{{'MCN'}},...
             'defaultModelCarbon',{{'LEM'}},...
             'LET',false,...
+            'IEDetail', false, ...
+            'IDetail', true, ...
             'sharedSubscorers',true,...
             'outputType','binary',... %'csv'; 'binary';%
             ... % This variable is only used for physicalDose, since for now it adds unnecessary computation time
-            'reportQuantity',{{'Sum','Standard_Deviation'}});         % 'reportQuantity',{{'Sum'}});
+            'reportQuantity',{{'Sum'}});%'reportQuantity',{{'Sum','Standard_Deviation'}});         % 'reportQuantity',{{'Sum'}});
         scorerRBEmodelOrderForEvaluation = {'MCN','WED','LEM','libamtrack'};
         bioParameters = struct( 'PrescribedDose',2,...
             'AlphaX',0.1,...
@@ -145,6 +150,8 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
             'Scorer_doseToMedium','TOPAS_scorer_doseToMedium.txt.in',...
             'Scorer_LET','TOPAS_subscorer_LET.txt.in',...
             'Scorer_doseToWater','TOPAS_scorer_doseToWater.txt.in',...
+            'Scorer_IEDetail', 'TOPAS_scorer_IEDetail.txt.in', ...
+            'Scorer_IDetail', 'TOPAS_scorer_IDetail.txt.in', ...
             'Scorer_RBE_libamtrack','TOPAS_scorer_doseRBE_libamtrack.txt.in',...
             'Scorer_RBE_LEM1','TOPAS_scorer_doseRBE_LEM1.txt.in',...
             'Scorer_RBE_WED','TOPAS_scorer_doseRBE_Wedenberg.txt.in',...
@@ -732,6 +739,7 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
 
             % Get all saved quantities
             % Make sure that the filename always ends on 'run1_tally'
+            files = [];
             switch obj.MCparam.outputType
                 case 'csv'
                     searchstr = 'score_matRad_plan_field1_run1_*.csv';
@@ -746,6 +754,24 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
                     nameBegin = strfind(searchstr,'*');
                     obj.MCparam.tallies = cellfun(@(s) s(nameBegin:end-4),{files(:).name},'UniformOutput',false);
             end
+
+            % This should be then moved inside case 'binary'
+            if (obj.clusterDoseIP == 'F')
+                searchstr = 'score_matRad_plan_field1_run1_ionizationDetail_ionizationIDsF*.csv';
+                isIDetail = dir([folder filesep searchstr]);
+                if ~isempty(isIDetail)
+                    files = dir([folder filesep searchstr]);
+                    nameBegin = strfind(searchstr,'*');
+                    newTallies  = cellfun(@(s) s(nameBegin:end-4),{files(:).name},'UniformOutput',false);
+                    for nTallies = 1:length(newTallies)
+                        newTallies{nTallies} = ['ionizationDetail_ionizationIDsF' newTallies{nTallies}];
+                    end
+                    obj.MCparam.tallies = {obj.MCparam.tallies{1:end}, newTallies{1:end}};
+                end
+            else
+                searchstr = 'score_matRad_plan_field1_run1_ionizationDetail_ionizationIDsM*.csv';
+            end
+            
 
             obj.MCparam.tallies = unique(obj.MCparam.tallies);
             talliesCut = replace(obj.MCparam.tallies,'-','_');
@@ -767,16 +793,20 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
                                 genFileName = sprintf('score_%s_field%d_run%d_%s',obj.MCparam.simLabel,f,k,tnameFile);
                             end
 
+                            if ~contains(genFileName, 'ionizationDetail')
+                                switch obj.MCparam.outputType
+                                    case 'csv'
+                                        % Generate csv file path to load
+                                        genFullFile = fullfile(folder,[genFileName '.csv']);
+                                    case 'binary'
+                                        % Generate bin file path to load
+                                        genFullFile = fullfile(folder,[genFileName '.bin']);
 
-                            switch obj.MCparam.outputType
-                                case 'csv'
-                                    % Generate csv file path to load
-                                    genFullFile = fullfile(folder,[genFileName '.csv']);
-                                case 'binary'
-                                    % Generate bin file path to load
-                                    genFullFile = fullfile(folder,[genFileName '.bin']);
-                                otherwise
-                                    matRad_cfg.dispError('Not implemented!');
+                                    otherwise
+                                        matRad_cfg.dispError('Not implemented!');
+                                end
+                            else
+                                genFullFile = fullfile(folder,[genFileName '.csv']);
                             end
 
                             % Read data from scored TOPAS files
@@ -1207,6 +1237,25 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
 
                 % Update MCparam.tallies with processed scorer
                 obj.MCparam.tallies = [obj.MCparam.tallies,{'physicalDose'}];
+            end
+
+            % write Ionization Detail scorers for cluster dose
+            if obj.scorer.IEDetail
+                fname = fullfile(obj.topasFolder,filesep,obj.scorerFolder,filesep,obj.infilenames.Scorer_IEDetail);
+                matRad_cfg.dispDebug('Reading ionizationDetail scorer IED (old) from %s\n',fname);
+                scorerName = fileread(fname);
+                fprintf(fID,'\n%s\n\n',scorerName);
+
+                % Update MCparam.tallies with processed scorer
+                obj.MCparam.tallies = [obj.MCparam.tallies,{'ionizationDetail'}];
+            elseif obj.scorer.IDetail
+                fname = fullfile(obj.topasFolder,filesep,obj.scorerFolder,filesep,obj.infilenames.Scorer_IDetail);
+                matRad_cfg.dispDebug('Reading ionizationDetail scorer ID (new) from %s\n',fname);
+                scorerName = fileread(fname);
+                fprintf(fID,'\n%s\n\n',scorerName);
+
+                % Update MCparam.tallies with processed scorer
+                obj.MCparam.tallies = [obj.MCparam.tallies,{'ionizationDetail'}];
             end
 
             % write RBE scorer
