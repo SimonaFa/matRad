@@ -1,26 +1,26 @@
 #-- Ionization Detail scorer
-s:Sc/Patient/Tally_ionizationDetail/Quantity 			= "IDetail"
-s:Sc/Patient/Tally_ionizationDetail/OutputFile 			= Sim/ScoreLabel + "_ionizationDetail"
-s:Sc/Patient/Tally_ionizationDetail/AveragingMethod 		= "track"
-b:Sc/Patient/Tally_ionizationDetail/InterpolateFrequencies 	= "True"
-s:Sc/Patient/Tally_ionizationDetail/Component 			= "Patient"
-d:Sc/Patient/Tally_ionizationDetail/IonMinKineticEnergy		= 0 MeV
+s:Sc/Patient/Tally_ionizationDetail/Quantity 			        = "IDetail"
+s:Sc/Patient/Tally_ionizationDetail/OutputFile 			        = Sim/ScoreLabel + "_ionizationDetail"
+s:Sc/Patient/Tally_ionizationDetail/AveragingMethod 		    = "track"
+b:Sc/Patient/Tally_ionizationDetail/InterpolateFrequencies 	    = "True"
+s:Sc/Patient/Tally_ionizationDetail/Component 			        = "Patient"
+d:Sc/Patient/Tally_ionizationDetail/IonMinKineticEnergy		    = 0 MeV
 d:Sc/Patient/Tally_ionizationDetail/ElectronMinKineticEnergy	= 0.0 eV
-d:Sc/Patient/Tally_ionizationDetail/ProtonMinKineticEnergy	= 0.0 eV
-s:Sc/Patient/Tally_ionizationDetail/DataBaseLocation		= "/home/s742o/TOPASplans/MCTS-DataBase"
+d:Sc/Patient/Tally_ionizationDetail/ProtonMinKineticEnergy	    = 0.0 eV
+s:Sc/Patient/Tally_ionizationDetail/DataBaseLocation		    = "/home/s742o/TOPASplans/MCTS-DataBase"
 s:Sc/Patient/Tally_ionizationDetail/IfOutputFileAlreadyExists 	= "Overwrite" 	#"Exit","Overwrite" or "Increment"
 
-b:Sc/Patient/Tally_ionizationDetail/IncludeElectrons		= "False"
-b:Sc/Patient/Tally_ionizationDetail/IncludeNeutrons		= "False"
-#d:Sc/Patient/Tally_ionizationDetail/IonMaxKineticEnergy	= 112.5 MeV
+b:Sc/Patient/Tally_ionizationDetail/IncludeElectrons		    = "False"
+b:Sc/Patient/Tally_ionizationDetail/IncludeNeutrons		        = "False"
+#d:Sc/Patient/Tally_ionizationDetail/IonMaxKineticEnergy	    = 112.5 MeV
 
 # Other parameters
-#s:Sc/Patient/Tally_ionizationDetail/OutputType 		= Sim/DoseScorerOutputType # "csv" "binary" "Root" "Xml" or "DICOM"
-b:Sc/Patient/Tally_ionizationDetail/OutputToConsole 		= "False"
-b:Sc/Patient/Tally_ionizationDetail/OutputAfterRun 		= "True" 
-b:Sc/Patient/Tally_ionizationDetail/Verbose 			= "False"
+s:Sc/Patient/Tally_ionizationDetail/OutputFileType 		        = Sim/DoseScorerOutputType # "csv" "binary" "Root" "Xml" or "DICOM"
+b:Sc/Patient/Tally_ionizationDetail/OutputToConsole 	        = "False"
+b:Sc/Patient/Tally_ionizationDetail/OutputAfterRun 		        = "True" 
+b:Sc/Patient/Tally_ionizationDetail/Verbose 			        = "False"
 
 ############################# IDetail scorer ##########################################################################
-b:Sc/Patient/Tally_ionizationDetail/IncludeExcitations			= "False"
+b:Sc/Patient/Tally_ionizationDetail/IncludeExcitations			    = "False"
 b:Sc/Patient/Tally_ionizationDetail/FilterByPrimariesSecondaries 	= "True"
-b:Sc/Patient/Tally_ionizationDetail/IncludeIp				= "True"
+b:Sc/Patient/Tally_ionizationDetail/IncludeIp				        = "True"
