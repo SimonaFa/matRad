@@ -756,6 +756,7 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
             end
 
             % This should be then moved inside case 'binary'
+            %{
             if (obj.clusterDoseIP == 'F')
                 searchstr = 'score_matRad_plan_field1_run1_ionizationDetail_ionizationIDsF*.csv';
                 isIDetail = dir([folder filesep searchstr]);
@@ -771,15 +772,41 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
             else
                 searchstr = 'score_matRad_plan_field1_run1_ionizationDetail_ionizationIDsM*.csv';
             end
-            
+            %}
 
             obj.MCparam.tallies = unique(obj.MCparam.tallies);
+            talliesCut = replace(obj.MCparam.tallies,'-','_');
+
+            % Momentarily only consider IP weighted sum
+            idx = 1;
+            for numTallies = 1:length(obj.MCparam.tallies)
+                if contains(obj.MCparam.tallies{numTallies}, 'ionizationDetail') 
+                    if (obj.clusterDoseIP == 'F')
+                        if contains(obj.MCparam.tallies{numTallies}, 'ionizationDetail_IonizationIDsF')
+                            newTallies{idx} = obj.MCparam.tallies{numTallies};
+                            idx = idx + 1;
+                        end
+                    elseif (obj.clusterDoseIP == 'N')
+                        if contains(obj.MCparam.tallies{numTallies}, 'ionizationDetail_IonizationIDsM')
+                            newTallies{idx} = obj.MCparam.tallies{numTallies};
+                            idx = idx + 1;
+                        end
+                    end
+                else
+                    newTallies{idx} = obj.MCparam.tallies{numTallies};
+                    idx = idx + 1;
+                end
+            end
+
+            obj.MCparam.tallies = newTallies;
             talliesCut = replace(obj.MCparam.tallies,'-','_');
 
             % Load data for each tally individually
             for t = 1:length(obj.MCparam.tallies)
                 tnameFile = obj.MCparam.tallies{t};
                 tname = talliesCut{t};
+                % Only read the relevant file
+
                 % Loop over all beams/fields and ctScenarios
                 for f = 1:obj.MCparam.nbFields
                     for ctScen = 1:obj.MCparam.numOfCtScen
@@ -793,25 +820,28 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
                                 genFileName = sprintf('score_%s_field%d_run%d_%s',obj.MCparam.simLabel,f,k,tnameFile);
                             end
 
-                            if ~contains(genFileName, 'ionizationDetail')
-                                switch obj.MCparam.outputType
-                                    case 'csv'
-                                        % Generate csv file path to load
-                                        genFullFile = fullfile(folder,[genFileName '.csv']);
-                                    case 'binary'
-                                        % Generate bin file path to load
-                                        genFullFile = fullfile(folder,[genFileName '.bin']);
 
-                                    otherwise
-                                        matRad_cfg.dispError('Not implemented!');
-                                end
-                            else
-                                genFullFile = fullfile(folder,[genFileName '.csv']);
+                            switch obj.MCparam.outputType
+                                case 'csv'
+                                    % Generate csv file path to load
+                                    genFullFile = fullfile(folder,[genFileName '.csv']);
+                                case 'binary'
+                                    % Generate bin file path to load
+                                    genFullFile = fullfile(folder,[genFileName '.bin']);
+
+                                otherwise
+                                    matRad_cfg.dispError('Not implemented!');
                             end
+
 
                             % Read data from scored TOPAS files
                             dataRead = obj.readBinCsvData(genFullFile);
 
+                            if contains(genFileName, 'ionizationDetail') && isprop(obj, 'clusterDoseK')
+                                tmp = dataRead{obj.clusterDoseK};
+                                dataRead = [];
+                                dataRead{1} = tmp;
+                            end
                             for i = 1:numel(dataRead)
                                 data.(obj.MCparam.scoreReportQuantity{i}){k} = dataRead{i};
                             end
@@ -877,29 +907,53 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
 
             matRad_cfg = MatRad_Config.instance(); %Instance of matRad configuration class
 
-            if ~isempty(strfind(lower(genFullFile),'.csv'))
-                % Read csv header file to get cubeDim and number of scorers automatically
-                fid = fopen(genFullFile);
-                header = textscan(fid,'%[^,],%[^,],%[^,]',1);
-                fclose(fid);
+            if ~contains(genFullFile, 'ionizationDetail_Ionization')
+                if ~isempty(strfind(lower(genFullFile),'.csv'))
+                    % Read csv header file to get cubeDim and number of scorers automatically
+                    fid = fopen(genFullFile);
+                    header = textscan(fid,'%[^,],%[^,],%[^,]',1);
+                    fclose(fid);
 
-                % Split header in rows
-                header = strsplit(strrep(header{1}{1},' ',''),'#');
-            elseif ~isempty(strfind(lower(genFullFile),'.bin'))
-                % Isolate filename without ending
-                [folder, filename] = fileparts(genFullFile);
-                strippedFileName = [folder filesep filename];
+                    % Split header in rows
+                    header = strsplit(strrep(header{1}{1},' ',''),'#');
+                elseif ~isempty(strfind(lower(genFullFile),'.bin'))
+                    % Isolate filename without ending
+                    [folder, filename] = fileparts(genFullFile);
+                    strippedFileName = [folder filesep filename];
 
-                % Read binheader file to get cubeDim and number of scorers automatically
-                fID = fopen([strippedFileName '.binheader']);
-                header = textscan(fID,'%c');
-                fclose(fID);
+                    % Read binheader file to get cubeDim and number of scorers automatically
+                    fID = fopen([strippedFileName '.binheader']);
+                    header = textscan(fID,'%c');
+                    fclose(fID);
 
-                % Split header in rows
-                header = strsplit(header{1}','#')';
+                    % Split header in rows
+                    header = strsplit(header{1}','#')';
+                else
+                    % Error if neither csv nor bin
+                    matRad_cfg.dispError('Not implemented!');
+                end
             else
-                % Error if neither csv nor bin
-                matRad_cfg.dispError('Not implemented!');
+                [folder, filename] = fileparts(genFullFile);
+                strippedFileName = [folder filesep 'score_matRad_plan_field1_run1_physicalDose'];
+                if ~isempty(strfind(lower(genFullFile),'.csv'))
+                    %Read csv header from physical Dose file
+                    filename = [strippedFileName '.csv'];
+
+                    fid = fopen(filename);
+                    header = textscan(fid,'%[^,],%[^,],%[^,]',1);
+                    fclose(fid);
+
+                    % Split header in rows
+                    header = strsplit(strrep(header{1}{1},' ',''),'#');
+                elseif ~isempty(strfind(lower(genFullFile),'.bin'))
+                    % Read binheader file to get cubeDim and number of scorers automatically
+                    fID = fopen([strippedFileName '.binheader']);
+                    header = textscan(fID,'%c');
+                    fclose(fID);
+
+                    % Split header in rows
+                    header = strsplit(header{1}','#')';
+                end
             end
 
             % Find rows where number of bins are stored
@@ -908,12 +962,18 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
             cubeDim(1) = str2double(header{xLine+1}(4:strfind(header{xLine+1},'binsof')-1));
             cubeDim(3) = str2double(header{xLine+2}(4:strfind(header{xLine+2},'binsof')-1));
 
-            if ~isempty(strfind(lower(genFullFile),'.csv'))
-                % Read out bin data
-                dataOut = matRad_readCsvData(genFullFile,cubeDim);
-            elseif ~isempty(strfind(lower(genFullFile),'.bin'))
-                % Read out bin data
-                dataOut = matRad_readBinData(genFullFile,cubeDim);
+            if ~contains(genFullFile, 'ionizationDetail_Ionization')
+                if ~isempty(strfind(lower(genFullFile),'.csv'))
+                    % Read out bin data
+                    dataOut = matRad_readCsvData(genFullFile,cubeDim);
+                elseif ~isempty(strfind(lower(genFullFile),'.bin'))
+                    % Read out bin data
+                    dataOut = matRad_readBinData(genFullFile,cubeDim);
+                end
+            else
+                % For now only read csv ionization detail
+                [folder, filename] = fileparts(genFullFile);
+                dataOut = matRad_readCsvData([folder filesep filename '.csv'],cubeDim);
             end
 
         end
@@ -1127,6 +1187,10 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
                             elseif ~isempty(strfind(topasCubesTallies{j},'LET'))
                                 if isfield(topasCubes,[topasCubesTallies{j} '_beam' num2str(d)]) && iscell(topasCubes.([topasCubesTallies{j} '_beam' num2str(d)]))
                                     dij.mLETDose{ctScen}(:,d)        = reshape(topasCubes.([topasCubesTallies{j} '_beam',num2str(d)]){ctScen},[],1) .* dij.physicalDose{ctScen}(:,d);
+                                end
+                            elseif contains(topasCubesTallies{j},'ionizationDetail')
+                                if isfield(topasCubes,[topasCubesTallies{j} '_beam' num2str(d)]) && iscell(topasCubes.([topasCubesTallies{j} '_beam' num2str(d)]))
+                                    dij.mClusterDose{ctScen}(:,d)        = reshape(topasCubes.([topasCubesTallies{j} '_beam',num2str(d)]){ctScen},[],1) .* dij.physicalDose{ctScen}(:,d);
                                 end
                             else
                                 matRad_cfg.dispError('Postprocessing error: Tallies handles incorrectly')

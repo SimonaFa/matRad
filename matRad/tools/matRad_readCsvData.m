@@ -1,24 +1,22 @@
 function dataOut = matRad_readCsvData(csvFile,cubeDim)
-
-% Instance of MatRad_Config class
-matRad_cfg = MatRad_Config.instance();
-
 % Read in csv file as table
 dataTable = readtable(csvFile,'ReadVariableNames',false);
 
-% Check if consistent with cubeDim
-if rem(size(dataTable,1),prod(cubeDim))==0
-    % this is the number of ReportQuantities contained in that file
-    numOfReportQuantities = size(dataTable,2)-3;
+% this is the number of ReportQuantities contained in that file
+numOfReportQuantities = size(dataTable,2)-3;
 
-    % Save all scored quantities as cell array and reshape to cubeDim
-    dataOut = cell(1,numOfReportQuantities);
-    for i = 1:numOfReportQuantities
-        dataOut{i} = reshape(dataTable.(['Var' num2str(i+3)]),cubeDim(3),cubeDim(2),cubeDim(1));
-        dataOut{i} = permute(dataOut{i},[2 3 1]);
-    end
-else
-    matRad_cfg.dispError('bin data contains an odd number of entries.')
+% Save all scored quantities as cell array and reshape to cubeDim
+dataOut = cell(1,numOfReportQuantities);
+
+%Get the indices and do i,j swap
+ixi = dataTable.Var2+1;
+ixj = dataTable.Var1+1;
+ixk = dataTable.Var3+1;
+ix = sub2ind(cubeDim,ixi,ixj,ixk);
+
+for i = 1:numOfReportQuantities
+    dataOut{i} = zeros(cubeDim);
+    dataOut{i}(ix) = dataTable.(['Var' num2str(i+3)]);
 end
 
 end
