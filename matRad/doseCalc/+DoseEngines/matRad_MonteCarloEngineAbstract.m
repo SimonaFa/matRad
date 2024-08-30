@@ -97,6 +97,7 @@ classdef (Abstract) matRad_MonteCarloEngineAbstract < DoseEngines.matRad_DoseEng
             % calculate cubes; use uniform weights here, weighting with actual fluence
             % already performed in dij construction
             resultGUI    = matRad_calcCubes(sum(w),dij);
+            %resultGUI    = matRad_calcCubes(ones(size(w)),dij);
             
             % remember original fluence weights
             resultGUI.w  = w;

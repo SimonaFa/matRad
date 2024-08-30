@@ -15,7 +15,7 @@ b:Sc/Patient/Tally_ionizationDetail/IncludeNeutrons		        = "False"
 #d:Sc/Patient/Tally_ionizationDetail/IonMaxKineticEnergy	    = 112.5 MeV
 
 # Other parameters
-s:Sc/Patient/Tally_ionizationDetail/OutputFileType 		        = Sim/DoseScorerOutputType # "csv" "binary" "Root" "Xml" or "DICOM"
+s:Sc/Patient/Tally_ionizationDetail/OutputFileType 		        = "csv" # "csv" "binary" "Root" "Xml" or "DICOM"
 b:Sc/Patient/Tally_ionizationDetail/OutputToConsole 	        = "False"
 b:Sc/Patient/Tally_ionizationDetail/OutputAfterRun 		        = "True" 
 b:Sc/Patient/Tally_ionizationDetail/Verbose 			        = "False"

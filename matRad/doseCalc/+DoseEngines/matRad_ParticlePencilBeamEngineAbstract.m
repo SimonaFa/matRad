@@ -204,7 +204,7 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
             end
             
             % calculate particle dose for bixel k on ray j of beam i
-            % convert from MeV cm^2/g per primary to Gy mm^2 per 1e6 primaries
+            % convert from [MeV cm^2/g] per primary to [Gy mm^2] per 1e6 primaries
             conversionFactor = 1.6021766208e-02;
 
             %Find all values we need to interpolate
@@ -268,8 +268,8 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
             end
             %}
             % calculate particle cluster dose for bixel k on ray j of beam i
-            % convert from mm^2/g per primary to mm^2/kg per 1e6 primaries
-            conversionFactorCD = 10^3;
+            % convert from mm^2/kg per primary to mm^2/kg per 1e6 primaries
+            conversionFactorCD = 10^6; 
             if this.calcClusterDose
                 if ~this.calcClusterDoseFromFluence
 

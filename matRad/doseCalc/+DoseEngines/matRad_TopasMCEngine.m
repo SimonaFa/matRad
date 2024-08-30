@@ -736,6 +736,9 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
 
             % Normalize with histories and particles/weight
             correctionFactor = obj.numParticlesPerHistory / double(obj.MCparam.nbHistoriesTotal);
+            %correctionFactor = obj.MCparam.nbParticlesTotal / double(obj.MCparam.nbHistoriesTotal);
+            % Divide by the total TOPAS simulated primaries and multiply by
+            % the total number of particles in the plan
 
             % Get all saved quantities
             % Make sure that the filename always ends on 'run1_tally'
@@ -850,8 +853,14 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
                             % Read data from scored TOPAS files
                             dataRead = obj.readBinCsvData(genFullFile);
 
+                            % Convert track weighted sum of the IP [nm] to
+                            % Cluster Dose [1/kg], multiplying by 1/(l rho Vj)
+                            % l     = 23.88*10^-6mm
+                            % rho   = 1g/mm3
+                            % Vj    = resx*resy*resz = 9 mm3   
+                            conversionFactorClusterDose = 10^3./(23.88 * (obj.doseGrid.resolution.x) * (obj.doseGrid.resolution.y) * (obj.doseGrid.resolution.z));
                             if contains(genFileName, 'ionizationDetail') && isprop(obj, 'clusterDoseK')
-                                tmp = dataRead{obj.clusterDoseK};
+                                tmp = dataRead{obj.clusterDoseK} .* conversionFactorClusterDose;
                                 dataRead = [];
                                 dataRead{1} = tmp;
                             end
@@ -876,7 +885,7 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
                             end
                         end
 
-                        if ~isempty(strfind(lower(tnameFile),'dose'))
+                        if ~isempty(strfind(lower(tnameFile),'dose')) || ~isempty(strfind(lower(tnameFile),'ionizationdetail'))
                             if obj.MCparam.nbRuns > 1
                                 % Calculate Standard Deviation from batches
                                 topasMeanDiff = zeros(cubeDim(1),cubeDim(2),cubeDim(3));
@@ -1111,7 +1120,7 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
                                 % Check if current quantity is available and write to dij
                                 if isfield(topasCubes,[topasCubesTallies{j} '_ray' num2str(dij.rayNum(d)) '_bixel' num2str(dij.bixelNum(d)) processedQuantities{p} '_beam' num2str(dij.beamNum(d))]) ...
                                         && iscell(topasCubes.([topasCubesTallies{j} '_ray' num2str(dij.rayNum(d)) '_bixel' num2str(dij.bixelNum(d)) processedQuantities{p} '_beam' num2str(dij.beamNum(d))]))
-                                    dij.([topasCubesTallies{j} processedQuantities{p}]){ctScen,1}(:,d) = sum(w)*reshape(topasCubes.([topasCubesTallies{j} '_ray' num2str(dij.rayNum(d)) '_bixel' num2str(dij.bixelNum(d)) processedQuantities{p} '_beam' num2str(dij.beamNum(d))]){ctScen},[],1);
+                                    dij.([topasCubesTallies{j} processedQuantities{p}]){ctScen,1}(:,d) = reshape(topasCubes.([topasCubesTallies{j} '_ray' num2str(dij.rayNum(d)) '_bixel' num2str(dij.bixelNum(d)) processedQuantities{p} '_beam' num2str(dij.beamNum(d))]){ctScen},[],1);
                                 end
                             end
                         end
@@ -1124,7 +1133,7 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
                             for p = 1:length(processedQuantities)
                                 % Check if current quantity is available and write to dij
                                 if isfield(topasCubes,[topasCubesTallies{j} processedQuantities{p} '_beam' num2str(d)]) && iscell(topasCubes.([topasCubesTallies{j} processedQuantities{p} '_beam' num2str(d)]))
-                                    dij.([topasCubesTallies{j} processedQuantities{p}]){ctScen}(:,d) = sum(w)*reshape(topasCubes.([topasCubesTallies{j} processedQuantities{p} '_beam',num2str(d)]){ctScen},[],1);
+                                    dij.([topasCubesTallies{j} processedQuantities{p}]){ctScen}(:,d) = reshape(topasCubes.([topasCubesTallies{j} processedQuantities{p} '_beam',num2str(d)]){ctScen},[],1);
                                 end
                             end
                         end
@@ -1145,7 +1154,7 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
                                     % Check if current quantity is available and write to dij
                                     if isfield(topasCubes,[topasCubesTallies{j} '_ray' num2str(dij.rayNum(d)) '_bixel' num2str(dij.bixelNum(d)) processedQuantities{p} '_beam' num2str(dij.beamNum(d))]) ...
                                             && iscell(topasCubes.([topasCubesTallies{j} '_ray' num2str(dij.rayNum(d)) '_bixel' num2str(dij.bixelNum(d)) processedQuantities{p} '_beam' num2str(dij.beamNum(d))]))
-                                        dij.([topasCubesTallies{j} processedQuantities{p}]){ctScen,1}(:,d) = sum(w)*reshape(topasCubes.([topasCubesTallies{j} '_ray' num2str(dij.rayNum(d)) '_bixel' num2str(dij.bixelNum(d)) processedQuantities{p} '_beam' num2str(dij.beamNum(d))]){ctScen},[],1);
+                                        dij.([topasCubesTallies{j} processedQuantities{p}]){ctScen,1}(:,d) = reshape(topasCubes.([topasCubesTallies{j} '_ray' num2str(dij.rayNum(d)) '_bixel' num2str(dij.bixelNum(d)) processedQuantities{p} '_beam' num2str(dij.beamNum(d))]){ctScen},[],1);
                                     end
                                 end
                                 % Handle RBE-related quantities (not multiplied by sum(w)!)
@@ -1182,7 +1191,7 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
                                 for p = 1:length(processedQuantities)
                                     % Check if current quantity is available and write to dij
                                     if isfield(topasCubes,[topasCubesTallies{j} processedQuantities{p} '_beam' num2str(d)]) && iscell(topasCubes.([topasCubesTallies{j} processedQuantities{p} '_beam' num2str(d)]))
-                                        dij.([topasCubesTallies{j} processedQuantities{p}]){ctScen}(:,d) = sum(w)*reshape(topasCubes.([topasCubesTallies{j} processedQuantities{p} '_beam',num2str(d)]){ctScen},[],1);
+                                        dij.([topasCubesTallies{j} processedQuantities{p}]){ctScen}(:,d) = reshape(topasCubes.([topasCubesTallies{j} processedQuantities{p} '_beam',num2str(d)]){ctScen},[],1);
                                     end
                                 end
                                 % Handle RBE-related quantities (not multiplied by sum(w)!)
@@ -1559,10 +1568,10 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
                 matRad_cfg.dispError('Given number of weights (#%d) doesn''t match bixel count in stf (#%d)',numel(w), sum([stf(:).totalNumOfBixels]));
             end
 
-            nParticlesTotalBixel = round(obj.numParticlesPerHistory * w);
-            nParticlesTotal = sum(nParticlesTotalBixel);
-            maxParticlesBixel = obj.numParticlesPerHistory * max(w(:));
-            minParticlesBixel = round(max([obj.minRelWeight*maxParticlesBixel,1]));
+            nParticlesTotalBixel = round(obj.numParticlesPerHistory * w);               % Number of particles per spot
+            nParticlesTotal = sum(nParticlesTotalBixel);                                % Total number of particles theoretically required for the plan
+            maxParticlesBixel = obj.numParticlesPerHistory * max(w(:));                 % Max num of particles required for some spot
+            minParticlesBixel = round(max([obj.minRelWeight*maxParticlesBixel,1]));     % min num of particles required for some other spot
 
             switch obj.modeHistories
                 case 'num'

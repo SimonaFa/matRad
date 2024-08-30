@@ -145,7 +145,7 @@ for num = 1:length(spectraIdx)
 end
 % Conversion factor from dividing by L = 23.88nm (mean chord
 % lenght) and rho = 1g/mm^3 (water density).
-cf = 10^9/23.88;            % 10^9 becomes 10^7 if the normalization is for cm^2
-clusterDose = fluenceIP.*cf;    % CD units mm^2/g per primary
+cf = 10^9/23.88;                % 10^9 becomes 10^7 if the normalization is for cm^2
+clusterDose = fluenceIP.*cf;    % CD units [mm^2/kg per primary]
 
 end
