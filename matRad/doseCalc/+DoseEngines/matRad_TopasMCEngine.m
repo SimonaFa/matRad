@@ -1120,7 +1120,7 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
                                 % Check if current quantity is available and write to dij
                                 if isfield(topasCubes,[topasCubesTallies{j} '_ray' num2str(dij.rayNum(d)) '_bixel' num2str(dij.bixelNum(d)) processedQuantities{p} '_beam' num2str(dij.beamNum(d))]) ...
                                         && iscell(topasCubes.([topasCubesTallies{j} '_ray' num2str(dij.rayNum(d)) '_bixel' num2str(dij.bixelNum(d)) processedQuantities{p} '_beam' num2str(dij.beamNum(d))]))
-                                    dij.([topasCubesTallies{j} processedQuantities{p}]){ctScen,1}(:,d) = reshape(topasCubes.([topasCubesTallies{j} '_ray' num2str(dij.rayNum(d)) '_bixel' num2str(dij.bixelNum(d)) processedQuantities{p} '_beam' num2str(dij.beamNum(d))]){ctScen},[],1);
+                                    dij.([topasCubesTallies{j} processedQuantities{p}]){ctScen,1}(:,d) = sum(w)*reshape(topasCubes.([topasCubesTallies{j} '_ray' num2str(dij.rayNum(d)) '_bixel' num2str(dij.bixelNum(d)) processedQuantities{p} '_beam' num2str(dij.beamNum(d))]){ctScen},[],1);
                                 end
                             end
                         end
@@ -1133,7 +1133,7 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
                             for p = 1:length(processedQuantities)
                                 % Check if current quantity is available and write to dij
                                 if isfield(topasCubes,[topasCubesTallies{j} processedQuantities{p} '_beam' num2str(d)]) && iscell(topasCubes.([topasCubesTallies{j} processedQuantities{p} '_beam' num2str(d)]))
-                                    dij.([topasCubesTallies{j} processedQuantities{p}]){ctScen}(:,d) = reshape(topasCubes.([topasCubesTallies{j} processedQuantities{p} '_beam',num2str(d)]){ctScen},[],1);
+                                    dij.([topasCubesTallies{j} processedQuantities{p}]){ctScen}(:,d) = sum(w)*reshape(topasCubes.([topasCubesTallies{j} processedQuantities{p} '_beam',num2str(d)]){ctScen},[],1);
                                 end
                             end
                         end
@@ -1154,7 +1154,7 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
                                     % Check if current quantity is available and write to dij
                                     if isfield(topasCubes,[topasCubesTallies{j} '_ray' num2str(dij.rayNum(d)) '_bixel' num2str(dij.bixelNum(d)) processedQuantities{p} '_beam' num2str(dij.beamNum(d))]) ...
                                             && iscell(topasCubes.([topasCubesTallies{j} '_ray' num2str(dij.rayNum(d)) '_bixel' num2str(dij.bixelNum(d)) processedQuantities{p} '_beam' num2str(dij.beamNum(d))]))
-                                        dij.([topasCubesTallies{j} processedQuantities{p}]){ctScen,1}(:,d) = reshape(topasCubes.([topasCubesTallies{j} '_ray' num2str(dij.rayNum(d)) '_bixel' num2str(dij.bixelNum(d)) processedQuantities{p} '_beam' num2str(dij.beamNum(d))]){ctScen},[],1);
+                                        dij.([topasCubesTallies{j} processedQuantities{p}]){ctScen,1}(:,d) = sum(w)*reshape(topasCubes.([topasCubesTallies{j} '_ray' num2str(dij.rayNum(d)) '_bixel' num2str(dij.bixelNum(d)) processedQuantities{p} '_beam' num2str(dij.beamNum(d))]){ctScen},[],1);
                                     end
                                 end
                                 % Handle RBE-related quantities (not multiplied by sum(w)!)
@@ -1191,7 +1191,7 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
                                 for p = 1:length(processedQuantities)
                                     % Check if current quantity is available and write to dij
                                     if isfield(topasCubes,[topasCubesTallies{j} processedQuantities{p} '_beam' num2str(d)]) && iscell(topasCubes.([topasCubesTallies{j} processedQuantities{p} '_beam' num2str(d)]))
-                                        dij.([topasCubesTallies{j} processedQuantities{p}]){ctScen}(:,d) = reshape(topasCubes.([topasCubesTallies{j} processedQuantities{p} '_beam',num2str(d)]){ctScen},[],1);
+                                        dij.([topasCubesTallies{j} processedQuantities{p}]){ctScen}(:,d) = sum(w)*reshape(topasCubes.([topasCubesTallies{j} processedQuantities{p} '_beam',num2str(d)]){ctScen},[],1);
                                     end
                                 end
                                 % Handle RBE-related quantities (not multiplied by sum(w)!)
