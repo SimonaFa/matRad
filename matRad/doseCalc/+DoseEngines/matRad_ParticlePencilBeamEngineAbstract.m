@@ -24,10 +24,12 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
         calcLET = true;                 % Boolean which defines if LET should be calculated
         calcBioDose = false;            % Boolean which defines if biological dose calculation shoudl be performed (alpha*dose and sqrt(beta)*dose)
 
-        calcClusterDose = true;         % Boolean which defines if Cluster Dose calculation should be performed
-        clusterDoseIP = 'F';            % Choose the Ip for CD calculation
-        clusterDoseK = 5;               % Choose index k for minimum cluster size
-        calcClusterDoseFromFluence = true;
+        calcClusterDose             = true;     % Boolean which defines if Cluster Dose calculation should be performed
+        clusterDoseIP               = 'F';      % Choose the Ip for CD calculation
+        clusterDoseK                = 5;        % Choose index k for minimum cluster size
+        calcClusterDoseFromFluence  = true;
+        calcPrimary                 = false;
+        calcSecondary               = false;
 
         airOffsetCorrection  = true;    % Corrects WEPL for SSD difference to kernel database
         lateralModel = 'auto';          % Lateral Model used. 'auto' uses the most accurate model available (i.e. multiple Gaussians). 'single','double','multi' try to force a singleGaussian or doubleGaussian model, if available
@@ -280,18 +282,50 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
             
                 else
                     if isfield(baseData, 'Fluence')
+                        % Total Cluster Dose (electrons excluded)
                         X.clusterDose = zeros(size(baseData.depths));
                         for partIdx = 1:length(baseData.Fluence.spectra)-1
                             %if baseData.Fluence.spectra(partIdx).Z <= 6
                                 if ( partIdx > 1 ) && ( baseData.Fluence.spectra(partIdx).Z == baseData.Fluence.spectra(partIdx - 1).Z )
-                                    % Do nothing because the hydrogen isotopes are
-                                    % automatically included
+                                    % Do nothing because the isotopes with same Z are automatically included
                                 else
                                     X.clusterDose = X.clusterDose + matRad_calcTotalIPxFluenceInDepth( baseData, [this.clusterDoseIP num2str(this.clusterDoseK)], baseData.Fluence.spectra(partIdx).Z )';
                                 end
                             %end
                         end
                         X.clusterDose = conversionFactorCD.*X.clusterDose;
+
+                        if ( contains(this.machine.meta.radiationMode,'proton' ) )
+                            primaryZ = 1;
+                            primaryA = 1;
+                        elseif ( contains(this.machine.meta.radiationMode,'helium' ) )
+                            primaryZ = 2;
+                        elseif ( contains(this.machine.meta.radiationMode,'carbon' ) )
+                            primaryZ = 6;
+                        end
+
+                        % Primary Cluster Dose
+                        X.clusterDosePrimary = zeros(size(baseData.depths));
+                        for partIdx = 1:length(baseData.Fluence.spectra)-1
+                            if ( baseData.Fluence.spectra(partIdx).Z == primaryZ && baseData.Fluence.spectra(partIdx).A == primaryA)
+                                %Implement to exclude deuterium and tritium
+                                X.clusterDosePrimary = X.clusterDosePrimary + matRad_calcTotalIPxFluenceInDepth( baseData, [this.clusterDoseIP num2str(this.clusterDoseK)], baseData.Fluence.spectra(partIdx).Z, baseData.Fluence.spectra(partIdx).A )';
+                            end
+                        end
+                        X.clusterDosePrimary = conversionFactorCD.*X.clusterDosePrimary;
+
+                        % Secondary Cluster Dose (electrons excluded)
+                        X.clusterDoseSecondary = zeros(size(baseData.depths));
+                        for partIdx = 1:length(baseData.Fluence.spectra)-1
+                            if ( baseData.Fluence.spectra(partIdx).A ~= primaryA)
+                                if ( baseData.Fluence.spectra(partIdx).Z == primaryZ )
+                                    X.clusterDoseSecondary = X.clusterDoseSecondary + matRad_calcTotalIPxFluenceInDepth( baseData, [this.clusterDoseIP num2str(this.clusterDoseK)], baseData.Fluence.spectra(partIdx).Z, baseData.Fluence.spectra(partIdx).A )';
+                                else
+                                    X.clusterDoseSecondary = X.clusterDoseSecondary + matRad_calcTotalIPxFluenceInDepth( baseData, [this.clusterDoseIP num2str(this.clusterDoseK)], baseData.Fluence.spectra(partIdx).Z)';
+                                end
+                            end
+                        end
+                        X.clusterDoseSecondary = conversionFactorCD.*X.clusterDoseSecondary;
                     else
                         error('Fluence basedata not found.');
                     end
@@ -473,7 +507,7 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
 
             % allocate Cluster Dose container and CD sparse matrix in dij struct
             if this.calcClusterDose
-                if isfield(this.machine.data,'clusterDose')
+                if isfield(this.machine.data,'clusterDose') || isfield(this.machine.data,'Fluence')
                     dij = this.allocateClusterDoseContainer(dij);
                 else
                     matRad_cfg = MatRad_Config.instance();
@@ -611,8 +645,14 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
 
             % get MatLab Config instance for displaying warings
             matRad_cfg = MatRad_Config.instance();
-            if isfield(this.machine.data,'clusterDose')
-                dij = this.allocateQuantityMatrixContainers(dij,{'mClusterDose'});         
+            if this.calcClusterDose
+                dij = this.allocateQuantityMatrixContainers(dij,{'mClusterDose'});
+                if this.calcPrimary
+                    dij = this.allocateQuantityMatrixContainers(dij,{'mClusterDosePrimary'});
+                end
+                if this.calcSecondary
+                    dij = this.allocateQuantityMatrixContainers(dij,{'mClusterDoseSecondary'});
+                end
             else
                 matRad_cfg.dispWarning('Cluster Dose not available in the machine data. Cluster Dose will not be calculated.');
             end

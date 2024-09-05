@@ -1,4 +1,4 @@
-function clusterDose = matRad_calcTotalIPxFluenceInDepth(singleData, nameIP, whichZ)
+function clusterDose = matRad_calcTotalIPxFluenceInDepth(singleData, nameIP, whichZ, whichA)
 % This function computes the fluence weighted sum of the IP from the
 % fluence spectra of all particles in the machine. Includes all species
 % from primaries to secondaries.
@@ -38,7 +38,7 @@ end
 
 if nargin == 2 % take all
     spectraIdx = 1:size(singleData.Fluence.spectra, 2);
-else
+elseif nargin == 3
     Zs = [singleData.Fluence.spectra.Z];
     Ms = [singleData.Fluence.spectra.A];
     spectraIdx = [];
@@ -49,6 +49,13 @@ else
          %   spectraIdx(choice) = find(Zs == whichZ(choice));
         %end
         spectraIdx = [spectraIdx, find(Zs == whichZ(choice))];
+    end
+elseif nargin ==4
+    Zs = [singleData.Fluence.spectra.Z];
+    Ms = [singleData.Fluence.spectra.A];
+    spectraIdx = [];
+    for choice=1:length(whichZ)
+        spectraIdx = [spectraIdx, find( (Zs == whichZ(choice)) & (Ms == whichA(choice)) ~= 0) ];
     end
 end 
 
@@ -145,7 +152,7 @@ for num = 1:length(spectraIdx)
 end
 % Conversion factor from dividing by L = 23.88nm (mean chord
 % lenght) and rho = 1g/mm^3 (water density).
-cf = 10^9/23.88;                % 10^9 becomes 10^7 if the normalization is for cm^2
+cf = 10^12/23.88;                % 10^9 becomes 10^7 if the normalization is for cm^2
 clusterDose = fluenceIP.*cf;    % CD units [mm^2/kg per primary]
 
 end

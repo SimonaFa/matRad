@@ -179,6 +179,12 @@ classdef matRad_ParticleHongPencilBeamEngine < DoseEngines.matRad_ParticlePencil
 
                 end
                 bixel.mClusterDose = Lcd .* kernels.clusterDose;
+                if this.calcPrimary
+                    bixel.mClusterDosePrimary   = Lcd .* kernels.clusterDosePrimary;
+                end
+                if this.calcSecondary
+                    bixel.mClusterDoseSecondary = Lcd .* kernels.clusterDoseSecondary;
+                end
             end
 
         end

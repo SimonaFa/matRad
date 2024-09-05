@@ -169,6 +169,7 @@ if any(cellfun(@(teststr) ~isempty(strfind(lower(teststr),'alpha')), fieldnames(
     resultGUI = rmfield(resultGUI,fnames);
 end
 
+%% Cluster Dose
 if isfield(dij,'mClusterDose')
     for i = 1:length(beamInfo)
         clusterDoseCube = dij.mClusterDose{scenNum} * (resultGUI.w .* beamInfo(i).logIx);
@@ -177,7 +178,24 @@ if isfield(dij,'mClusterDose')
         resultGUI.(['clusterDose', beamInfo(i).suffix]) = reshape(full(clusterDoseCube),dij.doseGrid.dimensions);
     end
 end
+if isfield(dij, 'mClusterDosePrimary')
+    for i = 1:length(beamInfo)
+        clusterDoseCubePrimary = dij.mClusterDosePrimary{scenNum} * (resultGUI.w .* beamInfo(i).logIx);
+        resultGUI.(['clusterDose_primary', beamInfo(i).suffix]) = zeros(dij.doseGrid.dimensions);
+        resultGUI.(['clusterDose_primary', beamInfo(i).suffix]) = clusterDoseCubePrimary;
+        resultGUI.(['clusterDose_primary', beamInfo(i).suffix]) = reshape(full(clusterDoseCubePrimary),dij.doseGrid.dimensions);
+    end
+end
+if isfield(dij, 'mClusterDoseSecondary')
+    for i = 1:length(beamInfo)
+        clusterDoseCubeSecondary = dij.mClusterDoseSecondary{scenNum} * (resultGUI.w .* beamInfo(i).logIx);
+        resultGUI.(['clusterDose_secondary', beamInfo(i).suffix]) = zeros(dij.doseGrid.dimensions);
+        resultGUI.(['clusterDose_secondary', beamInfo(i).suffix]) = clusterDoseCubeSecondary;
+        resultGUI.(['clusterDose_secondary', beamInfo(i).suffix]) = reshape(full(clusterDoseCubeSecondary),dij.doseGrid.dimensions);
+    end
+end
 
+%%
 % group similar fields together
 resultGUI = orderfields(resultGUI);
 

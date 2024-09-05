@@ -794,12 +794,12 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
             for nTal = 1:length(obj.MCparam.tallies)
                 if contains(obj.MCparam.tallies{nTal}, 'ionizationDetail') 
                     if (obj.clusterDoseIP == 'F')
-                        if contains(obj.MCparam.tallies{nTal}, 'ionizationDetail_IonizationIDsF')
+                        if contains(obj.MCparam.tallies{nTal}, 'ionizationDetail_IonizationIDsF') || contains(obj.MCparam.tallies{nTal}, 'IonizationIDsPrimaryF') || contains(obj.MCparam.tallies{nTal}, 'IonizationIDsSecondaryF')
                             newTallies{idx} = obj.MCparam.tallies{nTal};
                             idx = idx + 1;
                         end
                     elseif (obj.clusterDoseIP == 'N')
-                        if contains(obj.MCparam.tallies{nTal}, 'ionizationDetail_IonizationIDsM')
+                        if contains(obj.MCparam.tallies{nTal}, 'ionizationDetail_IonizationIDsM') || contains(obj.MCparam.tallies{nTal}, 'IonizationIDsPrimaryM') || contains(obj.MCparam.tallies{nTal}, 'IonizationIDsSecondaryM')
                             newTallies{idx} = obj.MCparam.tallies{nTal};
                             idx = idx + 1;
                         end
@@ -856,9 +856,9 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
                             % Convert track weighted sum of the IP [nm] to
                             % Cluster Dose [1/kg], multiplying by 1/(l rho Vj)
                             % l     = 23.88*10^-6mm
-                            % rho   = 1g/mm3
+                            % rho   = 1g/cm3
                             % Vj    = resx*resy*resz = 9 mm3   
-                            conversionFactorClusterDose = 10^3./(23.88 * (obj.doseGrid.resolution.x) * (obj.doseGrid.resolution.y) * (obj.doseGrid.resolution.z));
+                            conversionFactorClusterDose = 10^6./(23.88 * (obj.doseGrid.resolution.x) * (obj.doseGrid.resolution.y) * (obj.doseGrid.resolution.z));
                             if contains(genFileName, 'ionizationDetail') && isprop(obj, 'clusterDoseK')
                                 tmp = dataRead{obj.clusterDoseK} .* conversionFactorClusterDose;
                                 dataRead = [];
@@ -1213,7 +1213,13 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
                                 end
                             elseif contains(topasCubesTallies{j},'ionizationDetail')
                                 if isfield(topasCubes,[topasCubesTallies{j} '_beam' num2str(d)]) && iscell(topasCubes.([topasCubesTallies{j} '_beam' num2str(d)]))
-                                    dij.mClusterDose{ctScen}(:,d)        = reshape(topasCubes.([topasCubesTallies{j} '_beam',num2str(d)]){ctScen},[],1) .* dij.physicalDose{ctScen}(:,d);
+                                    if contains(topasCubesTallies{j}, 'IDsPrimary')
+                                        dij.mClusterDosePrimary{ctScen}(:,d)        = sum(w) .* reshape(topasCubes.([topasCubesTallies{j} '_beam',num2str(d)]){ctScen},[],1);
+                                    elseif contains(topasCubesTallies{j}, 'IDsSecondary')
+                                        dij.mClusterDoseSecondary{ctScen}(:,d)      = sum(w) .* reshape(topasCubes.([topasCubesTallies{j} '_beam',num2str(d)]){ctScen},[],1);
+                                    else
+                                        dij.mClusterDose{ctScen}(:,d)               = sum(w) .* reshape(topasCubes.([topasCubesTallies{j} '_beam',num2str(d)]){ctScen},[],1);
+                                    end
                                 end
                             else
                                 matRad_cfg.dispError('Postprocessing error: Tallies handles incorrectly')

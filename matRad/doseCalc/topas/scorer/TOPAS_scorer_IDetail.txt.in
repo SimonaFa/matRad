@@ -17,7 +17,7 @@ b:Sc/Patient/Tally_ionizationDetail/IncludeNeutrons		        = "False"
 # Other parameters
 s:Sc/Patient/Tally_ionizationDetail/OutputFileType 		        = "csv" # "csv" "binary" "Root" "Xml" or "DICOM"
 b:Sc/Patient/Tally_ionizationDetail/OutputToConsole 	        = "False"
-b:Sc/Patient/Tally_ionizationDetail/OutputAfterRun 		        = "True" 
+b:Sc/Patient/Tally_ionizationDetail/OutputAfterRun 		        = "False" 
 b:Sc/Patient/Tally_ionizationDetail/Verbose 			        = "False"
 
 ############################# IDetail scorer ##########################################################################
