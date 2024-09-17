@@ -235,7 +235,9 @@ if enable(2) == 1
     end
 
     if exist('pln','var') && ~isempty(pln)
-        if strcmp(pln.bioParam.quantityVis,'physicalDose')
+        if isfield(pln, 'displayQuantity') && (contains(pln.displayQuantity, 'clusterDose'))
+            yLabelString = 'clusterDose [1/kg]';
+        elseif strcmp(pln.bioParam.quantityVis,'physicalDose')
             yLabelString = 'Dose [Gy]';
         else
             yLabelString = 'RBE x Dose [Gy(RBE)]';

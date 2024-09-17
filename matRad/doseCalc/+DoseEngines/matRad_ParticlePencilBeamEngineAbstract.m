@@ -275,11 +275,11 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
             if this.calcClusterDose
                 if ~this.calcClusterDoseFromFluence
 
-                cDoseIP = baseData.clusterDose.([this.clusterDoseIP 'k']);
-                %X.clusterDose = cDoseIP(this.clusterDoseK).cDVector';
-                X.clusterDose = cDoseIP(this.clusterDoseK).cDVecNoEl';
-                X.clusterDose = conversionFactorCD.*X.clusterDose;
-            
+                    cDoseIP = baseData.clusterDose.([this.clusterDoseIP 'k']);
+                    %X.clusterDose = cDoseIP(this.clusterDoseK).cDVector';
+                    X.clusterDose = cDoseIP(this.clusterDoseK).cDVecNoEl';
+                    X.clusterDose = conversionFactorCD.*X.clusterDose;
+
                 else
                     if isfield(baseData, 'Fluence')
                         % Total Cluster Dose (electrons excluded)
@@ -300,16 +300,20 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
                             primaryA = 1;
                         elseif ( contains(this.machine.meta.radiationMode,'helium' ) )
                             primaryZ = 2;
+                            primaryA = NaN;
                         elseif ( contains(this.machine.meta.radiationMode,'carbon' ) )
                             primaryZ = 6;
+                            primaryA = NaN;
                         end
 
                         % Primary Cluster Dose
                         X.clusterDosePrimary = zeros(size(baseData.depths));
                         for partIdx = 1:length(baseData.Fluence.spectra)-1
-                            if ( baseData.Fluence.spectra(partIdx).Z == primaryZ && baseData.Fluence.spectra(partIdx).A == primaryA)
+                            if ( baseData.Fluence.spectra(partIdx).Z == primaryZ && baseData.Fluence.spectra(partIdx).A == primaryA && primaryZ == 1 )
                                 %Implement to exclude deuterium and tritium
                                 X.clusterDosePrimary = X.clusterDosePrimary + matRad_calcTotalIPxFluenceInDepth( baseData, [this.clusterDoseIP num2str(this.clusterDoseK)], baseData.Fluence.spectra(partIdx).Z, baseData.Fluence.spectra(partIdx).A )';
+                            elseif (baseData.Fluence.spectra(partIdx).Z == primaryZ && primaryZ ~= 1 )
+                                X.clusterDosePrimary = X.clusterDosePrimary + matRad_calcTotalIPxFluenceInDepth( baseData, [this.clusterDoseIP num2str(this.clusterDoseK)], baseData.Fluence.spectra(partIdx).Z)';
                             end
                         end
                         X.clusterDosePrimary = conversionFactorCD.*X.clusterDosePrimary;
@@ -317,11 +321,15 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
                         % Secondary Cluster Dose (electrons excluded)
                         X.clusterDoseSecondary = zeros(size(baseData.depths));
                         for partIdx = 1:length(baseData.Fluence.spectra)-1
-                            if ( baseData.Fluence.spectra(partIdx).A ~= primaryA)
-                                if ( baseData.Fluence.spectra(partIdx).Z == primaryZ )
+                            if ( baseData.Fluence.spectra(partIdx).Z == primaryZ )
+                                if (~isnan(primaryA) && baseData.Fluence.spectra(partIdx).A ~= primaryA)
                                     X.clusterDoseSecondary = X.clusterDoseSecondary + matRad_calcTotalIPxFluenceInDepth( baseData, [this.clusterDoseIP num2str(this.clusterDoseK)], baseData.Fluence.spectra(partIdx).Z, baseData.Fluence.spectra(partIdx).A )';
-                                else
+                                end
+                            else 
+                                if ( isnan(baseData.Fluence.spectra(partIdx).A) )
                                     X.clusterDoseSecondary = X.clusterDoseSecondary + matRad_calcTotalIPxFluenceInDepth( baseData, [this.clusterDoseIP num2str(this.clusterDoseK)], baseData.Fluence.spectra(partIdx).Z)';
+                                else 
+                                    X.clusterDoseSecondary = X.clusterDoseSecondary + matRad_calcTotalIPxFluenceInDepth( baseData, [this.clusterDoseIP num2str(this.clusterDoseK)], baseData.Fluence.spectra(partIdx).Z, baseData.Fluence.spectra(partIdx).A )';
                                 end
                             end
                         end
@@ -337,16 +345,29 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
             if isfield(baseData, 'Fluence')
                 if isfield(baseData.Fluence.spectra, 'tripleGauss')
                     for partIdx = 1:numel(baseData.Fluence.spectra)
-                        X.fluence(partIdx).sigma1 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.sigma1', bixel.radDepths);
-                        X.fluence(partIdx).sigma2 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.sigma2', bixel.radDepths);
-                        X.fluence(partIdx).sigma3 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.sigma3', bixel.radDepths);
-                        X.fluence(partIdx).w2 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.w2', bixel.radDepths);
-                        X.fluence(partIdx).w3 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.w3', bixel.radDepths);
-                        X.fluence(partIdx).cumFluence = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).fluenceDepth', bixel.radDepths);
+                        % Calc single particle cluster Dose
+                        if isnan(baseData.Fluence.spectra(partIdx).A)
+                            tmpCD = matRad_calcTotalIPxFluenceInDepth( baseData, [this.clusterDoseIP num2str(this.clusterDoseK)], baseData.Fluence.spectra(partIdx).Z )';
+                        else
+                            tmpCD = matRad_calcTotalIPxFluenceInDepth( baseData, [this.clusterDoseIP num2str(this.clusterDoseK)], baseData.Fluence.spectra(partIdx).Z, baseData.Fluence.spectra(partIdx).A )';
+                        end
+                        X.clusterDoseParticles(partIdx).clusterDoseProfile = conversionFactorCD.* matRad_interp1(depths, tmpCD, bixel.radDepths);
+                        X.Fluence(partIdx).sigma1 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.sigma1', bixel.radDepths);
+                        X.Fluence(partIdx).sigma2 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.sigma2', bixel.radDepths);
+                        X.Fluence(partIdx).sigma3 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.sigma3', bixel.radDepths);
+                        X.Fluence(partIdx).w2 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.w2', bixel.radDepths);
+                        X.Fluence(partIdx).w3 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.w3', bixel.radDepths);
+                        X.Fluence(partIdx).cumFluence = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).fluenceDepth', bixel.radDepths);
                     end
                 end
             end
 
+        end
+
+        function dist3 = tripleGaussRadial(radialDist, sigma1, sigma2, sigma3, weight2, weight3)
+            gaussDist = @(r, s) exp( -r.^2 ./ (2*s.^2)) ./ (2*pi*s.^2);
+            gaussDist3 = @(r, s1, s2, s3, w2, w3) (1 - w2 - w3) .* gaussDist(r, s1) + w2 .* gaussDist(r, s2) + w3 .* gaussDist(r, s3); 
+            dist3 = gaussDist3(radialDist, sigma1, sigma2, sigma3, weight2, weight3);
         end
 
         % We override this function to boost efficiency a bit (latDistX & Z
@@ -637,6 +658,24 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
             else
                 matRad_cfg.dispWarning('LET not available in the machine data. LET will not be calculated.');
             end
+
+        end
+        
+        function dij = loadClusterDoseBaseData(this,cst,dij)
+            %1) load machine if not yet loadet to this.machine
+            
+            %2) check the cluster doses we want to have computed
+
+            %3) check if you want to calculate from fluence
+            % - if no, you do nothing because you have your cluster dose
+            % kernels already
+            % - if yes, calculate the cluster dose kernels from fluence and 
+            % overwrite them in the loaded machine
+            % - - cluster dose in depth is easy
+            % - - lateral needs to be added and do a quick Gaussian fit /
+            % other parameterization?
+            
+            % 4) use cluster dsoe
 
         end
         

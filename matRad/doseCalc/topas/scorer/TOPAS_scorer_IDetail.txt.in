@@ -12,6 +12,7 @@ s:Sc/Patient/Tally_ionizationDetail/IfOutputFileAlreadyExists 	= "Overwrite" 	#"
 
 b:Sc/Patient/Tally_ionizationDetail/IncludeElectrons		    = "False"
 b:Sc/Patient/Tally_ionizationDetail/IncludeNeutrons		        = "False"
+b:Sc/Patient/Tally_ionizationDetail/EnergyStepFromTrack		    = "True"
 #d:Sc/Patient/Tally_ionizationDetail/IonMaxKineticEnergy	    = 112.5 MeV
 
 # Other parameters
