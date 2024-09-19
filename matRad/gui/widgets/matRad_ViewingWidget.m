@@ -1156,7 +1156,7 @@ classdef matRad_ViewingWidget < matRad_Widget
                             elseif strfind(this.DispInfo{i,1},'LET')
                                 this.DispInfo{i,3} = '[keV/um]';
                             elseif strfind(this.DispInfo{i,1}, 'clusterDose')
-                                this.DispInfo{i,3} = '[10^{18} ionizations / kg]';
+                                this.DispInfo{i,3} = ['g(' pln.propDoseCalc.clusterDoseIP num2str(pln.propDoseCalc.clusterDoseK) ') [1 / kg]'];
                             else
                                 this.DispInfo{i,3} = '[a.u.]';
                             end

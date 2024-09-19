@@ -30,6 +30,7 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
         calcClusterDoseFromFluence  = true;
         calcPrimary                 = false;
         calcSecondary               = false;
+        calcCDScatteringFromDose    = false;
 
         airOffsetCorrection  = true;    % Corrects WEPL for SSD difference to kernel database
         lateralModel = 'auto';          % Lateral Model used. 'auto' uses the most accurate model available (i.e. multiple Gaussians). 'single','double','multi' try to force a singleGaussian or doubleGaussian model, if available
@@ -242,37 +243,34 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
             end   
             
             % Cluster Dose
-            % Lateral Kernel Model
-            %{
-            if isfield(baseData, 'Fluence')
-                if isfield(baseData.Fluence.spectra, 'sigma')
-                    error('Not implemented')
-                    X.sigmacd = baseData.Fluence.spectra.sigma;
-                elseif isfield(baseData.Fluence.spectra, 'doubleGauss')
-                    error('Not implemented')
-                    X.sigma1cd = baseData.Fluence.spectra.doubleGauss.sigma1;
-                    X.sigma1cd = baseData.Fluence.spectra.doubleGauss.sigma2;
-                    X.weightcd = baseData.Fluence.spectra.tripleGauss.w;
-                elseif isfield(baseData.Fluence.spectra, 'tripleGauss')
-                    for partIdx = numel(baseData.Fluence.spectra)
-
-                        X.sigma1cd = baseData.Fluence.spectra.tripleGauss.sigma1;
-                        X.sigma2cd = baseData.Fluence.spectra.tripleGauss.sigma2;
-                        X.sigma3cd = baseData.Fluence.spectra.tripleGauss.sigma3;
-                        X.weight2cd = baseData.Fluence.spectra.tripleGauss.w2;
-                        X.weight3cd = baseData.Fluence.spectra.tripleGauss.w3;
-                    end
-                else
-                    %Sanity check
-                    matRad_cfg = MatRad_Config.instance();
-                    matRad_cfg.dispError('Invalid Lateral Model');
-                end
-            end
-            %}
+            
             % calculate particle cluster dose for bixel k on ray j of beam i
             % convert from mm^2/kg per primary to mm^2/kg per 1e6 primaries
             conversionFactorCD = 10^6; 
             if this.calcClusterDose
+                % Identify primary particle in order to calculate lateral scattering
+                if strcmp(this.machine.meta.radiationMode, 'carbon')
+                    for idx = 1:length(bixel.baseData.Fluence.spectra)
+                        if bixel.baseData.Fluence.spectra(idx).Z == 6
+                            primaryIdx = idx;
+                        end
+                    end
+                elseif strcmp(this.machine.meta.radiationMode, 'helium')
+                    for idx = 1:length(bixel.baseData.Fluence.spectra)
+                        if bixel.baseData.Fluence.spectra(idx).Z == 2
+                            primaryIdx = idx;
+                        end
+                    end
+                elseif strcmp(this.machine.meta.radiationMode, 'protons')
+                    for idx = 1:length(bixel.baseData.Fluence.spectra)
+                        if (bixel.baseData.Fluence.spectra(idx).Z == 1) && (bixel.baseData.Fluence.spectra(idx).A == 1)
+                            primaryIdx = idx;
+                        end
+                    end
+                else
+                    error('primary particle not found \n');
+                end
+
                 if ~this.calcClusterDoseFromFluence
 
                     cDoseIP = baseData.clusterDose.([this.clusterDoseIP 'k']);
@@ -280,9 +278,24 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
                     X.clusterDose = cDoseIP(this.clusterDoseK).cDVecNoEl';
                     X.clusterDose = conversionFactorCD.*X.clusterDose;
 
+                    if ~this.calcCDScatteringFromDose
+                        if isfield(baseData, 'Fluence')
+                            X.cDoseSigma1 = baseData.Fluence.spectra(primaryIdx).tripleGauss.sigma1';
+                            X.cDoseSigma2 = baseData.Fluence.spectra(primaryIdx).tripleGauss.sigma2';
+                            X.cDoseSigma3 = baseData.Fluence.spectra(primaryIdx).tripleGauss.sigma3';
+                            X.cDoseWeight2 = baseData.Fluence.spectra(primaryIdx).tripleGauss.w2';
+                            X.cDoseWeight3 = baseData.Fluence.spectra(primaryIdx).tripleGauss.w3';
+                        else
+                            % Trow a warning and use dose lateral
+                        end
+                    else
+                        % Do nothing
+                    end
+
                 else
                     if isfield(baseData, 'Fluence')
                         % Total Cluster Dose (electrons excluded)
+                        %{
                         X.clusterDose = zeros(size(baseData.depths));
                         for partIdx = 1:length(baseData.Fluence.spectra)-1
                             %if baseData.Fluence.spectra(partIdx).Z <= 6
@@ -294,7 +307,10 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
                             %end
                         end
                         X.clusterDose = conversionFactorCD.*X.clusterDose;
+                        %}
 
+
+                        %{
                         if ( contains(this.machine.meta.radiationMode,'proton' ) )
                             primaryZ = 1;
                             primaryA = 1;
@@ -305,8 +321,10 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
                             primaryZ = 6;
                             primaryA = NaN;
                         end
+                        %}
 
                         % Primary Cluster Dose
+                        %{
                         X.clusterDosePrimary = zeros(size(baseData.depths));
                         for partIdx = 1:length(baseData.Fluence.spectra)-1
                             if ( baseData.Fluence.spectra(partIdx).Z == primaryZ && baseData.Fluence.spectra(partIdx).A == primaryA && primaryZ == 1 )
@@ -317,8 +335,9 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
                             end
                         end
                         X.clusterDosePrimary = conversionFactorCD.*X.clusterDosePrimary;
-
+                        %}
                         % Secondary Cluster Dose (electrons excluded)
+                        %{
                         X.clusterDoseSecondary = zeros(size(baseData.depths));
                         for partIdx = 1:length(baseData.Fluence.spectra)-1
                             if ( baseData.Fluence.spectra(partIdx).Z == primaryZ )
@@ -334,14 +353,18 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
                             end
                         end
                         X.clusterDoseSecondary = conversionFactorCD.*X.clusterDoseSecondary;
+                        %}
+
                     else
                         error('Fluence basedata not found.');
                     end
+
                 end
             end
 
-            X = structfun(@(v) matRad_interp1(depths,v,bixel.radDepths,'nearest'),X,'UniformOutput',false); %Extrapolate to zero?           
+            X = structfun(@(v) matRad_interp1(depths,v,bixel.radDepths,'nearest'),X,'UniformOutput',false); %Extrapolate to zero?
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        if this.calcClusterDoseFromFluence
             if isfield(baseData, 'Fluence')
                 if isfield(baseData.Fluence.spectra, 'tripleGauss')
                     for partIdx = 1:numel(baseData.Fluence.spectra)
@@ -361,6 +384,7 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
                     end
                 end
             end
+        end
 
         end
 
