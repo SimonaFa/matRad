@@ -273,9 +273,9 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
 
                 if ~this.calcClusterDoseFromFluence
 
-                    cDoseIP = baseData.clusterDose.([this.clusterDoseIP 'k']);
+                    %cDoseIP = baseData.clusterDose.([this.clusterDoseIP 'k']);
                     %X.clusterDose = cDoseIP(this.clusterDoseK).cDVector';
-                    X.clusterDose = cDoseIP(this.clusterDoseK).cDVecNoEl';
+                    X.clusterDose = baseData.clusterDose.([this.clusterDoseIP 'k'])(this.clusterDoseK).cDVecNoEl';
                     X.clusterDose = conversionFactorCD.*X.clusterDose;
 
                     if ~this.calcCDScatteringFromDose

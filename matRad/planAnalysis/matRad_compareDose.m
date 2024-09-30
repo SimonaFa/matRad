@@ -201,9 +201,17 @@ if enable(1) == 1
         
         % Adjusting axes
         matRad_plotAxisLabels(hfig.(planename{plane}).('cube1').Axes,ct,plane,slicename{plane},[],100);
-        set(get(hfig.(planename{plane}).('cube1').Axes, 'title'), 'string', 'Dose 1');
+        if strcmp(pln.displayQuantity, 'clusterDose')
+            set(get(hfig.(planename{plane}).('cube1').Axes, 'title'), 'string', ['clusterDose ' pln.propDoseCalc.clusterDoseIP num2str(pln.propDoseCalc.clusterDoseK) ' matRad']);
+        else
+            set(get(hfig.(planename{plane}).('cube1').Axes, 'title'), 'string', 'Dose 1');
+        end
         matRad_plotAxisLabels(hfig.(planename{plane}).('cube2').Axes,ct,plane,slicename{plane},[],100);
-        set(get(hfig.(planename{plane}).('cube2').Axes, 'title'), 'string', 'Dose 2');
+        if strcmp(pln.displayQuantity, 'clusterDose')
+            set(get(hfig.(planename{plane}).('cube2').Axes, 'title'), 'string', ['clusterDose ' pln.propDoseCalc.clusterDoseIP num2str(pln.propDoseCalc.clusterDoseK) ' TOPAS']);
+        else
+            set(get(hfig.(planename{plane}).('cube2').Axes, 'title'), 'string', 'Dose 2');
+        end
         matRad_plotAxisLabels(hfig.(planename{plane}).('diff').Axes,ct,plane,slicename{plane},[],100);
         set(get(hfig.(planename{plane}).('diff').Axes, 'title'), 'string', 'Absolute difference');
         matRad_plotAxisLabels(hfig.(planename{plane}).('gamma').Axes,ct,plane,slicename{plane},[],100);
@@ -236,7 +244,7 @@ if enable(2) == 1
 
     if exist('pln','var') && ~isempty(pln)
         if isfield(pln, 'displayQuantity') && (contains(pln.displayQuantity, 'clusterDose'))
-            yLabelString = 'clusterDose [1/kg]';
+            yLabelString = ['g(' pln.propDoseCalc.clusterDoseIP num2str(pln.propDoseCalc.clusterDoseK) ') [$kg^{-1}$]'];
         elseif strcmp(pln.bioParam.quantityVis,'physicalDose')
             yLabelString = 'Dose [Gy]';
         else
@@ -254,9 +262,10 @@ if enable(2) == 1
     hold on
     plot(posX,profilex{2},'r--')
     xlabel('X [mm]','FontSize',fontsize)
-    ylabel(yLabelString,'FontSize',fontsize);
+    ylabel(yLabelString,'FontSize',fontsize, 'Interpreter','latex');
     title('x-Profiles');
-    legend({'Dose 1','Dose 2'},'Location','southeast')
+    %legend({'Dose 1','Dose 2'},'Location','southeast')
+    legend({'matRad','TOPAS'},'Location','southeast')
     legend boxoff
     
     hfig.profiles.y = subplot(2,2,2);
@@ -264,9 +273,10 @@ if enable(2) == 1
     hold on
     plot(posY,profiley{2},'r--')
     xlabel('Y [mm]','FontSize',fontsize)
-    ylabel(yLabelString,'FontSize',fontsize);
+    ylabel(yLabelString,'FontSize',fontsize, 'Interpreter','latex');
     title('y-Profiles');
-    legend({'Dose 1','Dose 2'},'Location','southeast')
+    %legend({'Dose 1','Dose 2'},'Location','southeast')
+    legend({'matRad','TOPAS'},'Location','southeast')
     legend boxoff
     
     hfig.profiles.z = subplot(2,2,3);
@@ -274,9 +284,10 @@ if enable(2) == 1
     hold on
     plot(posZ,profilez{2},'r--')
     xlabel('Z [mm]','FontSize',fontsize)
-    ylabel(yLabelString,'FontSize',fontsize);
+    ylabel(yLabelString,'FontSize',fontsize, 'Interpreter','latex');
     title('z-Profiles');
-    legend({'Dose 1','Dose 2'},'Location','southeast')
+    %legend({'Dose 1','Dose 2'},'Location','southeast')
+    legend({'matRad','TOPAS'},'Location','southeast')
     legend boxoff
     
     set(hfig.profiles.fig,'name',['Profiles:, x=',num2str(slicename{1}),'mm, y=',num2str(slicename{2}),'mm, z=',num2str(slicename{3}),'mm']);

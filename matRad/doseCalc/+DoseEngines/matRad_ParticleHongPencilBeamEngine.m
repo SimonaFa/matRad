@@ -109,49 +109,41 @@ classdef matRad_ParticleHongPencilBeamEngine < DoseEngines.matRad_ParticlePencil
                 bixel.mSqrtBetaDose = bixel.physicalDose .* sqrt(bixelBeta);
             end  
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-            gaussDist = @(r, s) exp( -r.^2 ./ (2*s.^2)) ./ (2*pi*s.^2);
-            gaussDist3 = @(r, s1, s2, s3, w2, w3) (1 - w2 - w3) .* gaussDist(r, s1) + w2 .* gaussDist(r, s2) + w3 .* gaussDist(r, s3); 
             if this.calcClusterDose
-                if isfield(bixel.baseData.Fluence.spectra, 'sigma')
-                    error('not implemented \n');
-                elseif isfield(bixel.baseData.Fluence.spectra, 'doubleGauss')
-                    error('not implemented \n');
-                elseif isfield(bixel.baseData.Fluence.spectra, 'tripleGauss')
-                    %{
-                    for partIdx = 1:numel(kernels.fluence)
-                        sigmaFl(partIdx).s1 = kernels.fluence(partIdx).sigma1.^2 + bixel.sigmaIniSq;
-                        sigmaFl(partIdx).s2 = kernels.fluence(partIdx).sigma2.^2 + bixel.sigmaIniSq;
-                        sigmaFl(partIdx).s3 = kernels.fluence(partIdx).sigma3.^2 + bixel.sigmaIniSq;
-                    end
-                    %}
+                if (this.calcClusterDoseFromFluence || ~this.calcCDScatteringFromDose)
+                    if isfield(bixel.baseData.Fluence.spectra, 'sigma')
+                        error('not implemented \n');
+                    elseif isfield(bixel.baseData.Fluence.spectra, 'doubleGauss')
+                        error('not implemented \n');
+                    elseif isfield(bixel.baseData.Fluence.spectra, 'tripleGauss')
 
-                    % Identify primary particle in order to calculate lateral scattering
-                    if strcmp(this.machine.meta.radiationMode, 'carbon')
-                        partIdx = 0;
-                        for idx = 1:length(bixel.baseData.Fluence.spectra)
-                            if bixel.baseData.Fluence.spectra(idx).Z == 6
-                                partIdx = idx;
+                        % Identify primary particle in order to calculate lateral scattering
+                        if strcmp(this.machine.meta.radiationMode, 'carbon')
+                            partIdx = 0;
+                            for idx = 1:length(bixel.baseData.Fluence.spectra)
+                                if bixel.baseData.Fluence.spectra(idx).Z == 6
+                                    partIdx = idx;
+                                end
                             end
-                        end
-                    elseif strcmp(this.machine.meta.radiationMode, 'helium')
-                        partIdx = 0;
-                        for idx = 1:length(bixel.baseData.Fluence.spectra)
-                            if bixel.baseData.Fluence.spectra(idx).Z == 2
-                                partIdx = idx;
+                        elseif strcmp(this.machine.meta.radiationMode, 'helium')
+                            partIdx = 0;
+                            for idx = 1:length(bixel.baseData.Fluence.spectra)
+                                if bixel.baseData.Fluence.spectra(idx).Z == 2
+                                    partIdx = idx;
+                                end
                             end
-                        end
-                    elseif strcmp(this.machine.meta.radiationMode, 'protons')
-                        partIdx = 0;
-                        for idx = 1:length(bixel.baseData.Fluence.spectra)
-                            if (bixel.baseData.Fluence.spectra(idx).Z == 1) && (bixel.baseData.Fluence.spectra(idx).A == 1) 
-                                partIdx = idx;
+                        elseif strcmp(this.machine.meta.radiationMode, 'protons')
+                            partIdx = 0;
+                            for idx = 1:length(bixel.baseData.Fluence.spectra)
+                                if (bixel.baseData.Fluence.spectra(idx).Z == 1) && (bixel.baseData.Fluence.spectra(idx).A == 1)
+                                    partIdx = idx;
+                                end
                             end
+                        else
+                            error('primary particle not found \n');
                         end
-                    else
-                        error('primary particle not found \n');
-                    end
 
-                    %{
+                        %{
                     sigmaPrimary(partIdx).s1 = sqrt(kernels.Fluence(partIdx).sigma1.^2 + bixel.sigmaIniSq);
                     sigmaPrimary(partIdx).s2 = sqrt(kernels.Fluence(partIdx).sigma2.^2 + bixel.sigmaIniSq);
                     sigmaPrimary(partIdx).s3 = sqrt(kernels.Fluence(partIdx).sigma3.^2 + bixel.sigmaIniSq);
@@ -160,28 +152,29 @@ classdef matRad_ParticleHongPencilBeamEngine < DoseEngines.matRad_ParticlePencil
                     LcDTotal = 0;
                     LcDSec = 0;
                     norm = 0;
-                    %}
-                    %{
+                        %}
+                        %{
                     for partIdx = 1:numel(kernels.fluence)
                         Lcd = Lcd + kernels.fluence(partIdx).cumFluence .* gaussDist3(sqrt(bixel.radialDist_sq), sigmaFl(partIdx).s1, sigmaFl(partIdx).s2, sigmaFl(partIdx).s3, kernels.fluence(1).w2, kernels.fluence(1).w3);
                         norm = norm + kernels.fluence(partIdx).cumFluence;
                     end
-                    %}
-                    %Lcd = Lcd ./ (norm);
-                    
-                    %LcDPrim = gaussDist3(sqrt(bixel.radialDist_sq), sigmaPrimary(partIdx).s1, sigmaPrimary(partIdx).s2, sigmaPrimary(partIdx).s3, kernels.Fluence(partIdx).w2, kernels.Fluence(partIdx).w3);
+                        %}
+                        %Lcd = Lcd ./ (norm);
 
-                    % Calc clusterDose Primary
+                        %LcDPrim = gaussDist3(sqrt(bixel.radialDist_sq), sigmaPrimary(partIdx).s1, sigmaPrimary(partIdx).s2, sigmaPrimary(partIdx).s3, kernels.Fluence(partIdx).w2, kernels.Fluence(partIdx).w3);
 
-                   
-                    % compute lateral sigmas
-                    %sigma1cd = kernels.sigma1.^2 + bixel.sigmaIniSq;
-                    %sigma2cd = kernels.sigma2.^2 + bixel.sigmaIniSq;
-    
-                    % calculate lateral profile
-                    %L_Narr =  exp( -bixel.radialDist_sq ./ (2*sigmaSqNarrow))./(2*pi*sigmaSqNarrow);
-                    %L_Bro  =  exp( -bixel.radialDist_sq./ (2*sigmaSqBroad ))./(2*pi*sigmaSqBroad );
-                    %L = (1-kernels.weight).*L_Narr + kernels.weight.*L_Bro;
+                        % Calc clusterDose Primary
+
+
+                        % compute lateral sigmas
+                        %sigma1cd = kernels.sigma1.^2 + bixel.sigmaIniSq;
+                        %sigma2cd = kernels.sigma2.^2 + bixel.sigmaIniSq;
+
+                        % calculate lateral profile
+                        %L_Narr =  exp( -bixel.radialDist_sq ./ (2*sigmaSqNarrow))./(2*pi*sigmaSqNarrow);
+                        %L_Bro  =  exp( -bixel.radialDist_sq./ (2*sigmaSqBroad ))./(2*pi*sigmaSqBroad );
+                        %L = (1-kernels.weight).*L_Narr + kernels.weight.*L_Bro;
+                    end
                 end
 
                 % Calc cluster dose Primary
@@ -223,7 +216,6 @@ classdef matRad_ParticleHongPencilBeamEngine < DoseEngines.matRad_ParticlePencil
                     end
                 else
 
-                    
                     if isfield(kernels, 'cDoseSigma1') && ~this.calcCDScatteringFromDose
                         % Calc sigmas
                         sigmaParticle.s1 = sqrt(kernels.cDoseSigma1.^2 + bixel.sigmaIniSq);
@@ -231,13 +223,10 @@ classdef matRad_ParticleHongPencilBeamEngine < DoseEngines.matRad_ParticlePencil
                         sigmaParticle.s3 = sqrt(kernels.cDoseSigma3.^2 + bixel.sigmaIniSq);
                         % Lateral triple Gaussian from Primary
                         LcD = this.tripleGaussRadial( sqrt(bixel.radialDist_sq), sigmaParticle.s1, sigmaParticle.s2, sigmaParticle.s3, kernels.cDoseWeight2, kernels.cDoseWeight3 );
+                        bixel.mClusterDose  = LcD .* kernels.clusterDose;
                     else
-                        LcD = L;
+                        bixel.mClusterDose  = L .* kernels.clusterDose;
                     end
-                    
-
-                    clusterDoseTotal    = L .* kernels.clusterDose;
-                    bixel.mClusterDose  = clusterDoseTotal;
 
                 end
                 %{
