@@ -32,6 +32,8 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
         calcSecondary               = false;
         calcCDScatteringFromDose    = false;
 
+        cutOffMethod = 'relative' % or 'relative'
+
         airOffsetCorrection  = true;    % Corrects WEPL for SSD difference to kernel database
         lateralModel = 'auto';          % Lateral Model used. 'auto' uses the most accurate model available (i.e. multiple Gaussians). 'single','double','multi' try to force a singleGaussian or doubleGaussian model, if available
 
@@ -914,20 +916,27 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
                         bixel.addSigmaSq = 0;
                         
                         % calculate dose
-                        if energyIx == 32
-                            boh = 1;
-                        end
                         bixel = this.calcParticleBixel(bixel);
                         dose_r = bixel.physicalDose;
-
+                        
+                        % integrate dose over area depending on radius
                         cumArea = cumsum(2*pi.*r_mid.*dose_r.*dr);
                         relativeTolerance = 0.5; %in [%]
+                        % validate IDD with integration
                         if abs((cumArea(end)./(idd(j)))-1)*100 > relativeTolerance
                             matRad_cfg.dispWarning('LateralParticleCutOff: shell integration is wrong !')
                         end
-
-                        IX = find(cumArea >= idd(j) * cutOffLevel,1, 'first');
-                        this.machine.data(energyIx).LatCutOff.CompFac = cutOffLevel^-1;
+                        
+                        %find radius at which integrated dose is becoming
+                        %bigger than cutoff * IDD
+                        if strcmp(this.cutOffMethod, 'integral')
+                            IX = find(cumArea >= idd(j) * cutOffLevel,1, 'first');
+                            this.machine.data(energyIx).LatCutOff.CompFac = cutOffLevel^-1;
+                        elseif strcmp(this.cutOffMethod, 'relative')
+                            IX = find(dose_r <= (1-cutOffLevel) * max(dose_r), 1, 'first');
+                            relFac = cumArea(IX)./idd(j); % or idd(j)
+                            this.machine.data(energyIx).LatCutOff.CompFac = relFac^-1;
+                        end
 
                         if isempty(IX)
                             depthDoseCutOff = Inf;
