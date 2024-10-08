@@ -32,7 +32,7 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
         calcSecondary               = false;
         calcCDScatteringFromDose    = false;
 
-        cutOffMethod = 'relative' % or 'relative'
+        cutOffMethod = 'integral' % or 'relative'
 
         airOffsetCorrection  = true;    % Corrects WEPL for SSD difference to kernel database
         lateralModel = 'auto';          % Lateral Model used. 'auto' uses the most accurate model available (i.e. multiple Gaussians). 'single','double','multi' try to force a singleGaussian or doubleGaussian model, if available
@@ -929,13 +929,16 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
                         
                         %find radius at which integrated dose is becoming
                         %bigger than cutoff * IDD
+                        if (depthValues(j)>=222 && depthValues(j)<=226)
+                            boh = 1;
+                        end
                         if strcmp(this.cutOffMethod, 'integral')
                             IX = find(cumArea >= idd(j) * cutOffLevel,1, 'first');
                             this.machine.data(energyIx).LatCutOff.CompFac = cutOffLevel^-1;
                         elseif strcmp(this.cutOffMethod, 'relative')
                             IX = find(dose_r <= (1-cutOffLevel) * max(dose_r), 1, 'first');
                             relFac = cumArea(IX)./idd(j); % or idd(j)
-                            this.machine.data(energyIx).LatCutOff.CompFac = relFac^-1;
+                            this.machine.data(energyIx).LatCutOff.CompFac(j) = relFac^-1;
                         end
 
                         if isempty(IX)
@@ -965,6 +968,7 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
                 maxSSD         = energySigmaLUT(ix_Max(subIx),3);
                 rangeShifter   = rangeShifterLUT(ix_Max(subIx));
                 TmpCompFac     = baseData.LatCutOff.CompFac;
+                
                 baseData.LatCutOff.CompFac = 1;
 
                 % plot 3D cutoff at one specific depth on a rather sparse grid
@@ -1085,14 +1089,17 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
                 else
                     idd = this.machine.data(energyIx).Z;
                 end
+                if length(TmpCompFac)>1
+                    TmpCompFac = matRad_interp1(depthValues, TmpCompFac', radDepths);
+                end
                 subplot(312),plot(this.machine.data(energyIx).depths,idd*conversionFactor,'k','LineWidth',2),grid on,hold on
                 plot(radDepths - this.machine.data(energyIx).offset,vDoseInt,'r--','LineWidth',2),hold on,
-                plot(radDepths - this.machine.data(energyIx).offset,vDoseInt * TmpCompFac,'bx','LineWidth',1),hold on,
+                plot(radDepths - this.machine.data(energyIx).offset,vDoseInt .* TmpCompFac,'bx','LineWidth',1),hold on,
                 legend({'original IDD',['cut off IDD at ' num2str(cutOffLevel) '%'],'cut off IDD with compensation'},'Location','northwest'),
                 xlabel('z [mm]'),ylabel('[MeV cm^2 /(g * primary)]'),set(gca,'FontSize',12)
 
                 totEnergy        = trapz(this.machine.data(energyIx).depths,idd*conversionFactor) ;
-                totEnergyCutOff  = trapz(radDepths,vDoseInt * TmpCompFac) ;
+                totEnergyCutOff  = trapz(radDepths,vDoseInt .* TmpCompFac) ;
                 relDiff          =  ((totEnergy/totEnergyCutOff)-1)*100;
                 title(['rel diff of integral dose ' num2str(relDiff) '%']);
                 baseData.LatCutOff.CompFac = TmpCompFac;
