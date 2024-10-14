@@ -23,5 +23,5 @@ b:Sc/Patient/Tally_ionizationDetail/Verbose 			        = "False"
 
 ############################# IDetail scorer ##########################################################################
 b:Sc/Patient/Tally_ionizationDetail/IncludeExcitations			    = "False"
-b:Sc/Patient/Tally_ionizationDetail/FilterByPrimariesSecondaries 	= "True"
+b:Sc/Patient/Tally_ionizationDetail/FilterByPrimariesSecondaries 	= "False"
 b:Sc/Patient/Tally_ionizationDetail/IncludeIp				        = "True"

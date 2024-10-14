@@ -182,7 +182,7 @@ classdef MatRad_Config < handle
             %  input
             
             %Default Steering/Geometry Properties
-            obj.defaults.propStf.longitudinalSpotSpacing = 2;
+            obj.defaults.propStf.longitudinalSpotSpacing = 3;
             obj.defaults.propStf.addMargin = true; %expand target for beamlet finding
             obj.defaults.propStf.bixelWidth = 5;
           

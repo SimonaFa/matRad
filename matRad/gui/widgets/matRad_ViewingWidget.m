@@ -729,7 +729,7 @@ classdef matRad_ViewingWidget < matRad_Widget
                 % plot physical dose
                 %Content =this.SelectedDisplayOption; %get(this.popupDisplayOption,'String');
                 SelectedCube = this.SelectedDisplayOption; %Content{get(this.popupDisplayOption,'Value')};
-                if sum(strcmp(SelectedCube,{'physicalDose','effect','RBExDose','alpha','beta','RBE'})) > 0
+                if sum(strcmp(SelectedCube,{'physicalDose','effect','RBExDose','alpha','beta','RBE', 'clusterDose'})) > 0
                     Suffix = '';
                 else
                     Idx    = find(SelectedCube == '_');
@@ -791,6 +791,17 @@ classdef matRad_ViewingWidget < matRad_Widget
                     set(ax(2),'ycolor','b')
                     set(ax,'FontSize',8);
                     Cnt=Cnt+2;
+                end
+
+                % Plot clusterDose profile
+                if isfield(Result,['clusterDose' Suffix]) && contains(SelectedCube, 'clusterDose')
+
+                    mClusterDose = Result.(['clusterDose' Suffix]);
+                    PlotHandles{1} = plot(handles.axesFig,vX,mClusterDose(ix),'color',cColor{1,1},'LineWidth',3); hold(handles.axesFig,'on');
+                    PlotHandles{1,2} ='clusterDose';
+                    ylabel(handles.axesFig,'cluster dose in [1/kg]');
+                    set(handles.axesFig,'FontSize',defaultFontSize);
+
                 end
                 
                 % asses target coordinates
