@@ -83,6 +83,9 @@ for runVoi = 1:size(cst,1)
         voiPrint = sprintf('%s\n%27s',voiPrint,' ');
         for runVX = 1:numel(refGy)
             sRefGy = num2str(refGy(runVX),3);
+            if contains(sRefGy, '+')
+                sRefGy = strrep(sRefGy,'+','_');
+            end
             qi(runVoi).(['V_' strrep(sRefGy,'.','_') 'Gy']) = VX(refGy(runVX));
             voiPrint = sprintf(['%sV' sRefGy 'Gy = %6.2f%%, '],voiPrint,VX(refGy(runVX))*100);
         end

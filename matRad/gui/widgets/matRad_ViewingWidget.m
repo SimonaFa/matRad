@@ -633,23 +633,24 @@ classdef matRad_ViewingWidget < matRad_Widget
                 
                 
                 %% plot iso dose lines
-                if this.plotIsoDoseLines 
-                    plotLabels = this.plotIsoDoseLinesLabels; 
-%                     
-%                     %Sanity Check for Contours, which actually should have been
-%                     %computed before calling UpdatePlot
-%                     if isempty(this.IsoDose_Contours) %~isfield(handles.IsoDose,'Contours')
-%                         try
-%                             this.IsoDose_Contours = matRad_computeIsoDoseContours(dose,this.IsoDose_Levels);
-%                         catch
-%                             %If the computation didn't work, we set the field to
-%                             %empty, which will force matRad_plotIsoDoseLines to use
-%                             %matlabs contour function instead of repeating the
-%                             %failing computation every time
-%                             this.IsoDose_Contours = [];
-%                             warning('Could not compute isodose lines! Will try slower contour function!');
-%                         end
-%                      end
+                if this.plotIsoDoseLines
+                    plotLabels = this.plotIsoDoseLinesLabels;
+                    %
+                    %                     %Sanity Check for Contours, which actually should have been
+                    %                     %computed before calling UpdatePlot
+                    %{
+                    if isempty(this.IsoDose_Contours) %~isfield(handles.IsoDose,'Contours')
+                        try
+                            this.IsoDose_Contours = matRad_computeIsoDoseContours(dose,this.IsoDose_Levels);
+                        catch
+                            %If the computation didn't work, we set the field to
+                            %empty, which will force matRad_plotIsoDoseLines to use
+                            %matlabs contour function instead of repeating the                             %failing computation every time
+                            this.IsoDose_Contours = [];
+                            warning('Could not compute isodose lines! Will try slower contour function!');
+                        end
+                    end
+                    %}
                     AxesHandlesIsoDose = matRad_plotIsoDoseLines(handles.axesFig,dose,this.IsoDose_Contours,this.IsoDose_Levels,plotLabels,this.plane,this.slice,doseMap,this.dispWindow{doseIx,1},'LineWidth',1.5);
                 end
             end
