@@ -182,7 +182,7 @@ classdef MatRad_Config < handle
             %  input
             
             %Default Steering/Geometry Properties
-            obj.defaults.propStf.longitudinalSpotSpacing = 2;
+            obj.defaults.propStf.longitudinalSpotSpacing = 3;
             obj.defaults.propStf.addMargin = true; %expand target for beamlet finding
             obj.defaults.propStf.bixelWidth = 5;
           
@@ -284,10 +284,22 @@ classdef MatRad_Config < handle
         end
 
         function setDefaultGUIProperties(obj)
-           obj.gui.backgroundColor = [0.5 0.5 0.5];
-           obj.gui.elementColor = [0.75 0.75 0.75];
-           obj.gui.textColor = [0 0 0];
-           
+           %obj.gui.backgroundColor = [0.5 0.5 0.5];
+           %obj.gui.elementColor = [0.75 0.75 0.75];
+           %obj.gui.textColor = [0 0 0];
+            
+           % Dark
+           obj.gui.backgroundColor = [0.0745    0.1824    0.3059];
+           obj.gui.elementColor    = [0.0497    0.1216    0.2039];
+           obj.gui.textColor       = [0.9172    0.5692    0.2853];
+           obj.gui.highlightColor  = [1         1         0     ];
+
+           % Light
+           %obj.gui.backgroundColor = [0.8286    0.8000    0.9600];
+           %obj.gui.elementColor    = [0.9000    0.8000    0.9000];
+           %obj.gui.textColor       = [0.1500         0    0.4500];
+           %obj.gui.highlightColor  = [0.1500         0    0.4500];
+
            obj.gui.fontSize = 8;
            obj.gui.fontWeight = 'bold';
            obj.gui.fontName = 'Helvetica';
