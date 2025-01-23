@@ -67,8 +67,12 @@ for num = 1:length(spectraIdx)
     if isnan(partM)
         partM = defA(defZ == singleData.Fluence.spectra(particleIdx).Z);
     end
+    if singleData.Fluence.spectra(particleIdx).Z == -1 && isfield(singleData.Fluence, 'energyBinEl')
+        energyBin = singleData.Fluence.energyBinEl;
+    else
+    end
     energyPerNucleon = energyBin./partM;
-    deltaEPN         = energyPerNucleon(2) - energyPerNucleon (1);
+    deltaEPN         = energyPerNucleon(2) - energyPerNucleon(1);
     containerIP      = zeros(size(energyPerNucleon));
 
     % This will be enlarged for Carbon

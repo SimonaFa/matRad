@@ -31,6 +31,7 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
         calcPrimary                 = false;
         calcSecondary               = false;
         calcCDScatteringFromDose    = false;
+        includeElectrons            = false;
 
         cutOffMethod = 'integral' % or 'relative'
 
@@ -277,7 +278,12 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
 
                     %cDoseIP = baseData.clusterDose.([this.clusterDoseIP 'k']);
                     %X.clusterDose = cDoseIP(this.clusterDoseK).cDVector';
-                    X.clusterDose = baseData.clusterDose.([this.clusterDoseIP 'k'])(this.clusterDoseK).cDVecNoEl';
+                    %X.clusterDose = baseData.clusterDose.([this.clusterDoseIP 'k'])(this.clusterDoseK).cDVecNoEl';
+                    if this.includeElectrons
+                        X.clusterDose = baseData.clusterDose.([this.clusterDoseIP 'k'])(this.clusterDoseK).cDVector';
+                    else
+                        X.clusterDose = baseData.clusterDose.([this.clusterDoseIP 'k'])(this.clusterDoseK).cDVecNoEl';
+                    end                        
                     X.clusterDose = conversionFactorCD.*X.clusterDose;
 
                     if ~this.calcCDScatteringFromDose
