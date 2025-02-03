@@ -37,7 +37,7 @@ if  ~exist('scenNum', 'var') || isempty(scenNum)
 end
 
 if ~exist('boolInterpolate', 'var') || isempty(boolInterpolate)
-    boolInterpolate = false;
+    boolInterpolate = true;
 end
 
 resultGUI.w = w;
@@ -102,11 +102,17 @@ end
 
 %% RBE weighted dose
 % consider RBE for protons and skip varRBE calculation
-if isfield(dij,'RBE') && isscalar(dij.RBE)
+if isfield(dij,'RBE') && isscalar(dij.RBE) && ~ any(cellfun(@(teststr) ~isempty(strfind(lower(teststr),'alpha')), fieldnames(dij)))
     for i = 1:length(beamInfo)
         resultGUI.(['RBExD', beamInfo(i).suffix]) = resultGUI.(['physicalDose', beamInfo(i).suffix]) * dij.RBE;
     end
 elseif any(cellfun(@(teststr) ~isempty(strfind(lower(teststr),'alpha')), fieldnames(dij)))
+
+    if isfield(dij,'RBE') && isscalar(dij.RBE)
+        for i = 1:length(beamInfo)
+            resultGUI.(['constRBExD', beamInfo(i).suffix]) = resultGUI.(['physicalDose', beamInfo(i).suffix]) * dij.RBE;
+        end
+    end
     % Load RBE models if MonteCarlo was calculated for multiple models
     if isfield(dij,'RBE_models')
         RBE_model = cell(1,length(dij.RBE_models));
