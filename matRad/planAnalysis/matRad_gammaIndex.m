@@ -171,7 +171,8 @@ gammaCube                    = sqrt(gammaCubeSqx);
 gammaCube(cube1<=0 & cube2<=0) = 0;
   
 % compute gamma pass rate
-doseIx          = cube1 > relDoseThreshold/100*max(cube1(:)) | cube2 > relDoseThreshold/100*max(cube2(:));
+doseIx          = cube2 > 0.1 * max(cube2);
+%doseIx          = cube1 > relDoseThreshold/100*max(cube1(:)) | cube2 > relDoseThreshold/100*max(cube2(:));
 numOfPassGamma  = sum(gammaCube(doseIx) < 1);
 gammaPassRate   = 100 * numOfPassGamma / sum(doseIx(:));
 

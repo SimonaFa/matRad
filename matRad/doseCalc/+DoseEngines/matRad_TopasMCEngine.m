@@ -125,7 +125,7 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
         converterFolder = 'materialConverter';
         scorerFolder = 'scorer';
         outfilenames = struct(  'patientParam','matRad_cube.txt',...
-            'patientCube','matRad_cube.dat');
+            'patientCube','matRad_cube.dat', 'physicsParams', 'physicsParams.txt');
 
         infilenames = struct(   'geometry','world/TOPAS_matRad_geometry.txt.in',...
             ... % BeamSetup files
@@ -157,7 +157,9 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
             'Scorer_RBE_WED','TOPAS_scorer_doseRBE_Wedenberg.txt.in',...
             'Scorer_RBE_MCN','TOPAS_scorer_doseRBE_McNamara.txt.in', ...
             ... %PhaseSpace Source
-            'phaseSpaceSourcePhotons' ,'VarianClinaciX_6MV_20x20_aboveMLC_w2' );
+            'phaseSpaceSourcePhotons' ,'VarianClinaciX_6MV_20x20_aboveMLC_w2', ...
+            ... % Physics
+            'physics', 'physics/TOPAS_physics_params.txt.in');
        
 
     end
@@ -1275,6 +1277,14 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
             fprintf(fID,'\n');
             fprintf(fID,['i:Ts/Seed = ',num2str(runIx),'\n']);
 
+            % Write TOPAS physics file
+            %physicsFileName = sprintf('physics_params.txt');
+            %fileIDp = fopen(fullfile(obj.workingDir,physicsFileName),'w');
+            obj.writePhysicsFile(fID);
+            %fclose(fileIDp);
+            % Include Physics file
+            %fprintf(fID,'includeFile = ./%s\n',physicsFileName);
+
             %TODO: remove or document 
             %fprintf(fID,'includeFile = %s/TOPAS_Simulation_Setup.txt\n',obj.thisFolder);
             %fprintf(fID,'includeFile = %s/TOPAS_matRad_geometry.txt\n',obj.thisFolder);
@@ -1319,6 +1329,20 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
 
         end
 
+        function writePhysicsFile(obj, fID)
+            matRad_cfg = MatRad_Config.instance(); %Instance of matRad configuration class
+        
+            % Preread Physics
+            fnameP = fullfile(obj.topasFolder,obj.infilenames.physics);
+            TOPAS_physics = fileread(fnameP);
+            matRad_cfg.dispInfo('Reading Physics list from ''%s''\n',fnameP);
+
+            % Write TOPAS physics file
+            fprintf(fID, '%s\n', TOPAS_physics);
+
+            % Do custom things here
+        end
+        
         function writeScorers(obj,fID)
             %TODO: Insert documentation
             matRad_cfg = MatRad_Config.instance(); %Instance of matRad configuration class
@@ -2209,6 +2233,7 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
                     % Include path to beamSetup file
                     fprintf(fileID,'includeFile = ./%s\n',fieldSetupFileName);
 
+                    
                     % Write lines from scorer files
                     obj.writeScorers(fileID);
 

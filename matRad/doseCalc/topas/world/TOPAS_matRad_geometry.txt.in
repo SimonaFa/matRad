@@ -41,3 +41,4 @@ s:Ge/Gantry/Type = "Group"
 d:Ge/Gantry/RotX = Sim/GantryAngle deg
 d:Ge/Gantry/RotY =  0 deg
 d:Ge/Gantry/RotZ = -90. deg
+

@@ -1,0 +1,7 @@
+################################################################################
+# Physics
+################################################################################
+d:Ph/Default/EMRangeMin = 100. eV # minimum for EM tables
+d:Ph/Default/EMRangeMax = 5000. MeV # maximum for EM tables
+#i:Ph/Default/EMBins = 77 # number of bins for EM tables
+i:Ph/Default/EMBinsPerDecade = 7 # number of bins per decade for EM tables

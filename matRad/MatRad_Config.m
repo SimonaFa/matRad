@@ -293,6 +293,7 @@ classdef MatRad_Config < handle
            obj.gui.elementColor    = [0.0497    0.1216    0.2039];
            obj.gui.textColor       = [0.9172    0.5692    0.2853];
            obj.gui.highlightColor  = [1         1         0     ];
+           %obj.gui.highlightColor  = [0.0497    0.1216    0.2039];
 
            % Light
            %obj.gui.backgroundColor = [0.8286    0.8000    0.9600];
