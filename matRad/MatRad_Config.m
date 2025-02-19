@@ -182,7 +182,7 @@ classdef MatRad_Config < handle
             %  input
             
             %Default Steering/Geometry Properties
-            obj.defaults.propStf.longitudinalSpotSpacing = 3;
+            obj.defaults.propStf.longitudinalSpotSpacing = 2;
             obj.defaults.propStf.addMargin = true; %expand target for beamlet finding
             obj.defaults.propStf.bixelWidth = 5;
           
@@ -211,7 +211,7 @@ classdef MatRad_Config < handle
                       
             %Optimization Options
             obj.defaults.propOpt.optimizer = 'IPOPT';
-            obj.defaults.propOpt.maxIter = 1500;
+            obj.defaults.propOpt.maxIter = 3000;
             obj.defaults.propOpt.runDAO = 0;
             obj.defaults.propOpt.clearUnusedVoxels = false;
 

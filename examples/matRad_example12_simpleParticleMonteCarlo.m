@@ -22,9 +22,9 @@ load BOXPHANTOM.mat
 %load PHANTOM_control.mat; ct.resolution.x = 2; ct.resolution.y = 2; ct.resolution.z = 2;
 
 % meta information for treatment plan
-pln.radiationMode   = 'protons';     % either photons / protons / carbon
+pln.radiationMode   = 'carbon';     % either photons / protons / carbon
 %pln.machine         = 'generic_TOPAS_cropped';
-pln.machine         = 'generic_MCsquare';
+pln.machine         = 'generic_clusterDose_prestep';
 
 
 pln.numOfFractions  = 1;
@@ -98,12 +98,18 @@ pln.propDoseCalc.numHistoriesDirect = 1e3;
 resultGUI_MC = matRad_calcDoseForward(ct,cst,stf,pln,resultGUI.w);
 
 %% Read an external calculation with TOPAS if externalCalculation was set to 'write'
-%pln.propDoseCalc.externalCalculation = resultGUI_MC.meta.TOPASworkingDir;
-%resultGUI_MC = matRad_calcDoseForward(ct,cst,stf,pln,resultGUI.w);
+pln.propDoseCalc.externalCalculation = ['C:\Users\s742o\Work\matRadLocal\userdata\TOPAS\carbon_Generic_clusterDose_prestep_10-02-25_box_F5'];%resultGUI_MC.meta.TOPASworkingDir;
+resultGUI_MC = matRad_calcDoseForward(ct,cst,stf,pln,resultGUI.w);
 
 %% Compare Dose
+pln.displayQuantity = 'absorbed Dose';
 resultGUI = matRad_appendResultGUI(resultGUI,resultGUI_MC,true,pln.propDoseCalc.engine);
 matRad_compareDose(resultGUI.physicalDose, resultGUI.(['physicalDose_' pln.propDoseCalc.engine]), ct, cst, [1, 1, 0] , 'off', pln, [2, 2], 3, 'global');
+
+%% Compare cluster Dose
+pln.displayQuantity = 'cluster Dose';
+resultGUI = matRad_appendResultGUI(resultGUI,resultGUI_MC,true,pln.propDoseCalc.engine);
+matRad_compareDose(resultGUI.clusterDose, resultGUI.(['clusterDose_' pln.propDoseCalc.engine]), ct, cst, [1, 1, 0] , 'off', pln, [2, 2], 3, 'global');
 
 
 %% Compare LET
