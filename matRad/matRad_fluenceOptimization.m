@@ -159,7 +159,8 @@ switch pln.propOpt.quantityOpt
         end
     case 'physicalDose'
         backProjection = matRad_DoseProjection;
-
+    case 'clusterDose'
+        backProjection = matRad_ClusterDoseProjection;
     case 'BED'
         backProjection = matRad_BEDProjection;
     otherwise
@@ -303,6 +304,12 @@ elseif isa(backProjection, 'matRad_EffectProjection')
     end
 
     matRad_cfg.dispInfo('chosen weights adapted to biological dose calculation!\n');
+
+elseif isa(backProjection, 'matRad_ClusterDoseProjection')
+    doseTmp = dij.mClusterDose{1}*wOnes;
+    bixelWeight =  (doseTarget)/mean(doseTmp(V));
+    wInit       = wOnes * bixelWeight;
+    matRad_cfg.dispInfo('chosen uniform weight of %f!\n',bixelWeight);
 
 else
     doseTmp = dij.physicalDose{1}*wOnes;

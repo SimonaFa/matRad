@@ -1,4 +1,4 @@
-function resultGUI = matRad_calcCubes(w,dij,scenNum,boolInterpolate)
+function resultGUI = matRad_calcCubes(w,dij,scenNum,boolInterpolate, calcChosenQuantities)
 % matRad computation of all cubes for the resultGUI struct
 % which is used as result container and for visualization in matRad's GUI
 %
@@ -38,6 +38,10 @@ end
 
 if ~exist('boolInterpolate', 'var') || isempty(boolInterpolate)
     boolInterpolate = true;
+end
+
+if ~exist('calcChosenQuantities', 'var') || isempty(calcChosenQuantities)
+    calcChosenQuantities = [];
 end
 
 resultGUI.w = w;
@@ -99,6 +103,18 @@ if isfield(dij,'mLETDose')
     end
 end
 
+%% clusterDose
+% consider g(I_p)
+if isfield(dij,'mClusterDose')
+    for i = 1:length(beamInfo)
+        clusterDoseCube                                     = reshape(full(dij.mClusterDose{scenNum} * (resultGUI.w .* beamInfo(i).logIx)),dij.doseGrid.dimensions);
+        resultGUI.(['clusterDose', beamInfo(i).suffix])     = clusterDoseCube;%zeros(dij.doseGrid.dimensions);
+        %if isfield(dij, 'doseWeightingThreshold')%.doseWeightingThreshold*max(resultGUI.physicalDose(:));)
+        %    ix                                                  = resultGUI.(['clusterDose', beamInfo(i).suffix]) > dij.doseWeightingThreshold*max(resultGUI.clusterDose(:));
+        %    resultGUI.(['clusterDose', beamInfo(i).suffix])(ix) = clusterDoseCube(ix)./resultGUI.(['clusterDose', beamInfo(i).suffix])(ix);
+        %end
+    end
+end
 
 %% RBE weighted dose
 % consider RBE for protons and skip varRBE calculation

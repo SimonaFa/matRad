@@ -48,6 +48,8 @@ classdef (Abstract) matRad_DistributionQuantity < matRad_OptimizationQuantity
                 distributionQuantity = 'mAlphaDose';
             elseif isfield(dij, 'mAlphaDoseExp') && ~isempty(dij.mAlphaDoseExp{1})
                 distributionQuantity = 'mAlphaDoseExp';
+            elseif isfield(dij, 'mClusterDose') && ~isempty(dij.mClusterDose{1})
+                distributionQuantity = 'clusterDose';
             end
 
             this.d     = cell(size(dij.(distributionQuantity)));
