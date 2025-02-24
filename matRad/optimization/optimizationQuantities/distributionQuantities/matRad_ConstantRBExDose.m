@@ -40,6 +40,12 @@ classdef matRad_ConstantRBExDose < matRad_DijDistributionQuantity
 
         end
 
+        function resultGUI = matRad_calcQuantityCubes(~, dij, resultGUI, scenNum, beamInfo)
+            for i = 1:length(beamInfo)
+                resultGUI.(['RBExDose', beamInfo(i).suffix]) = resultGUI.(['physicalDose', beamInfo(i).suffix]){scenNum} * dij.RBE;
+            end
+        end
+
     end
 
 end

@@ -41,7 +41,22 @@ if ~exist('boolInterpolate', 'var') || isempty(boolInterpolate)
 end
 
 if ~exist('calcChosenQuantities', 'var') || isempty(calcChosenQuantities)
-    calcChosenQuantities = [];
+    calcChosenQuantities = matRad_BackProjectionQuantity.getAvailableOptimizationQuantities();
+else
+    availableQuantities = matRad_BackProjectionQuantity.getAvailableOptimizationQuantities();
+    %tmp = struct();
+    % Fieldnames
+    %fields = fieldnames(availableStruct);
+    % Create empty struct with cell2struct
+    %tmp = cell2struct(cell(length(fieldnames(availableQuantities)), 1), fieldnames(availableQuantities), 1);
+    tmp = [];
+    for idx=1:length(calcChosenQuantities)
+        if any(strcmp(calcChosenQuantities{idx}, {availableQuantities.quantityName}))
+            tmp = [tmp availableQuantities(strcmp(calcChosenQuantities{idx}, {availableQuantities.quantityName}))];
+            %tmp(end+1) = availableQuantities(strcmp(calcChosenQuantities{idx}, {availableQuantities.quantityName})); 
+        end
+    end
+    calcChosenQuantities = tmp;
 end
 
 resultGUI.w = w;
@@ -60,8 +75,23 @@ beamInfo(dij.numOfBeams+1).logIx  = true(size(resultGUI.w,1),1);
 
 [ctScen,~] = ind2sub(size(dij.physicalDose),scenNum);
 
+%% Calc single quantities
 
+for idxQ = 1:length(calcChosenQuantities)
+    %if strcmp(calcChosenQuantities(idxQ).quantityName, 'physicalDose') ||  strcmp(calcChosenQuantities(idxQ).quantityName, 'constantRBExDose')
+    if strcmp(calcChosenQuantities(idxQ).quantityName, 'physicalDose') ||  strcmp(calcChosenQuantities(idxQ).quantityName, 'RBExDose')
+        for j=1:length(beamInfo)
+            fieldRG = [calcChosenQuantities(idxQ).quantityName, beamInfo(j).suffix];
+            cubeQuantity = matRad_calcSingleQuantity(dij,w.*beamInfo(j).logIx,calcChosenQuantities(idxQ),scenNum);
+            %resultGUI = matRad_calcSingleQuantity(dij, resultGUI, calcChosenQuantities(idxQ), scenNum, beamInfo);
+            resultGUI.([fieldRG]) = cubeQuantity;
+        end
+    end
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Physical Dose
+%{
 doseFields = {'physicalDose','doseToWater'};
 doseQuantities = {'','_std','_batchStd'};
 % compute physical dose for all beams individually and together
@@ -84,12 +114,15 @@ for j = 1:length(doseFields)
         end
     end
 end
+%}
 
+% FIX THIS
+%{
 if ~isfield(dij,'doseWeightingThreshold')
     dij.doseWeightingThreshold = 0.01;
 end
 absoluteDoseWeightingThreshold = dij.doseWeightingThreshold*max(resultGUI.physicalDose(:));
-
+%}
 
 
 %% LET
@@ -105,6 +138,7 @@ end
 
 %% clusterDose
 % consider g(I_p)
+%{
 if isfield(dij,'mClusterDose')
     for i = 1:length(beamInfo)
         clusterDoseCube                                     = reshape(full(dij.mClusterDose{scenNum} * (resultGUI.w .* beamInfo(i).logIx)),dij.doseGrid.dimensions);
@@ -115,6 +149,7 @@ if isfield(dij,'mClusterDose')
         %end
     end
 end
+%}
 
 %% RBE weighted dose
 % consider RBE for protons and skip varRBE calculation

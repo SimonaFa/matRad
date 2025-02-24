@@ -28,7 +28,7 @@ matRad_rc; %If this throws an error, run it from the parent directory first to s
 % Let's begin with a clear Matlab environment and import the prostate
 % patient into your workspace
 
-load('PROSTATE.mat');
+load('BOXPHANTOM_D.mat');
 
 %% Treatment Plan
 % The next step is to define your treatment plan labeled as 'pln'. This 
@@ -44,22 +44,26 @@ load('PROSTATE.mat');
 % 'proton_Generic.mat'; consequently the machine has to be set accordingly
 pln.radiationMode = 'protons';        
 pln.machine       = 'Generic';
-pln.bioModel      = 'constRBE';
-pln.multScen      = 'nomScen';
+%pln.bioModel      = 'constantRBExDose';
+%pln.multScen      = 'nomScen';
+quantityOpt   = 'RBExDose';
+modelName     = 'MCN';
+pln.bioParam = matRad_bioModel(pln.radiationMode, modelName);
+pln.multScen = matRad_multScen(ct,'nomScen');
 
 %%
 % for particles it is possible to also calculate the LET disutribution
 % alongside the physical dose. Therefore you need to activate the
 % corresponding option during dose calculcation. We also explicitly say to
 % use the Hong Pencil Beam Algorithm
-pln.propDoseCalc.calcLET = 0;
+pln.propDoseCalc.calcLET = 1;
 pln.propDoseCalc.engine = 'HongPB';
                                        
 %%
 % Now we have to set the remaining plan parameters.
 pln.numOfFractions        = 30;
-pln.propStf.gantryAngles  = [90 270];
-pln.propStf.couchAngles   = [0 0];
+pln.propStf.gantryAngles  = [90];
+pln.propStf.couchAngles   = [0];
 pln.propStf.bixelWidth    = 5;
 pln.propStf.numOfBeams    = numel(pln.propStf.gantryAngles);
 pln.propStf.isoCenter     = ones(pln.propStf.numOfBeams,1) * matRad_getIsoCenter(cst,ct,0);
@@ -72,7 +76,7 @@ pln.propDoseCalc.doseGrid.resolution.y = 3; % [mm]
 pln.propDoseCalc.doseGrid.resolution.z = 3; % [mm]
 
 % Optimization settings
-pln.propOpt.quantityOpt = 'RBExDose';
+pln.propOpt.quantityOpt = quantityOpt;
 
 %% Generate Beam Geometry STF
 stf = matRad_generateStf(ct,cst,pln);
@@ -87,7 +91,8 @@ dij = matRad_calcDoseInfluence(ct,cst,stf,pln);
 % The goal of the fluence optimization is to find a set of bixel/spot 
 % weights which yield the best possible dose distribution according to the
 % clinical objectives and constraints underlying the radiation treatment
-resultGUI = matRad_fluenceOptimization(dij,cst,pln);
+%resultGUI = matRad_fluenceOptimization(dij,cst,pln);
+resultGUI = matRad_fluenceOptimizationQuantities(dij, cst, pln);
 
 %% Plot the Resulting Dose Slice
 % Let's plot the transversal iso-center dose slice

@@ -236,7 +236,7 @@ classdef matRad_BackProjectionQuantity < handle
             
             availableQuantitiesClassList = matRad_findSubclasses('matRad_OptimizationQuantity', 'folders', folders , 'includeSubfolders',true);
 
-            quantityInfos = matRad_identifyClassesByConstantProperties(availableQuantitiesClassList,'quantityName');
+            quantityInfos = matRad_identifyClassesByConstantProperties(availableQuantitiesClassList,'quantityName');%, 'additionalPropertyNames', {'dijField'});
 
         end
 

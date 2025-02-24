@@ -459,7 +459,7 @@ wOpt = optimizer.wResult;
 info = optimizer.resultInfo;
 
 try
-    resultGUI = matRad_calcCubes(wOpt,dij);
+    resultGUI = matRad_calcCubes(wOpt, dij, scen4D, [], []);
 catch
     matRad_cfg.dispWarning('Unable to compue calcCubes');
 end

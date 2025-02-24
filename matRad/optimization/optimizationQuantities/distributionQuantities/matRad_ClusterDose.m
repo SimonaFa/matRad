@@ -19,6 +19,16 @@ classdef matRad_ClusterDose < matRad_DijDistributionQuantity
             
             this@matRad_DijDistributionQuantity(supArg{:});
         end
+%{
+
+        function resultGUI = matRad_calcQuantityCubes(~, dij, resultGUI, scenNum, beamInfo)
+            if isfield(dij,'mClusterDose')
+                for i = 1:length(beamInfo)
+                    resultGUI.(['clusterDose', beamInfo(i).suffix])     = reshape(full(dij.mClusterDose{scenNum} * (resultGUI.w .* beamInfo(i).logIx)),dij.doseGrid.dimensions);
+                end
+            end
+        end
+%}
     end
 
 end
