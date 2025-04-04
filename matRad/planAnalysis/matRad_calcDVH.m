@@ -44,7 +44,7 @@ if ~exist('doseGrid', 'var') || isempty(doseGrid)
     minDose = min(doseCube(:));
 
     % get dvhPoints for every structure and every scenario the same
-    n = 1000;
+    n = 100;
     if strcmp(dvhType, 'cum')
         doseGrid = linspace(0,maxDose*1.05,n);
     elseif strcmp(dvhType, 'diff')

@@ -211,3 +211,5 @@ if exist('slice','var') && ~isempty(slice)
             '% pass gamma criterion (' num2str(relDoseThreshold) '% / ' ...
             num2str(dist2AgreeMm) 'mm)']; ['with ' num2str(2^n-1) ' interpolation points']});
 end
+
+gammaCube(doseIx==0) = 0;

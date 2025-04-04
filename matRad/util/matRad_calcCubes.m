@@ -176,6 +176,11 @@ if isfield(dij,'mClusterDose')
         resultGUI.(['clusterDose', beamInfo(i).suffix]) = zeros(dij.doseGrid.dimensions);
         resultGUI.(['clusterDose', beamInfo(i).suffix]) = clusterDoseCube;
         resultGUI.(['clusterDose', beamInfo(i).suffix]) = reshape(full(clusterDoseCube),dij.doseGrid.dimensions);
+        if isfield(dij,'mClusterDose_Std')
+            clusterDoseStdCube = dij.mClusterDose_Std;
+            resultGUI.(['clusterDose', '_batchStd', beamInfo(i).suffix]) = sqrt(reshape(full(clusterDoseStdCube{scenNum}.^2 * (resultGUI.w .* beamInfo(i).logIx)),dij.doseGrid.dimensions));
+            %resultGUI.([doseFields{j}, doseQuantities{k}, beamInfo(i).suffix])(isnan(resultGUI.([doseFields{j}, doseQuantities{k}, beamInfo(i).suffix]))) = 0;
+        end
     end
 end
 if isfield(dij, 'mClusterDosePrimary')

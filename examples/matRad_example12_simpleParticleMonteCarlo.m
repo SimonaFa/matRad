@@ -98,7 +98,7 @@ pln.propDoseCalc.numHistoriesDirect = 1e3;
 resultGUI_MC = matRad_calcDoseForward(ct,cst,stf,pln,resultGUI.w);
 
 %% Read an external calculation with TOPAS if externalCalculation was set to 'write'
-pln.propDoseCalc.externalCalculation = ['C:\Users\s742o\Work\matRadLocal\userdata\TOPAS\carbon_Generic_clusterDose_prestep_10-02-25_box_F5'];%resultGUI_MC.meta.TOPASworkingDir;
+pln.propDoseCalc.externalCalculation = ['C:\Users\s742o\Work\matRadLocal\userdata\TOPAS\carbon_Generic_clusterDose_prestep_18-02-25_box_F5'];%resultGUI_MC.meta.TOPASworkingDir;
 resultGUI_MC = matRad_calcDoseForward(ct,cst,stf,pln,resultGUI.w);
 
 %% Compare Dose

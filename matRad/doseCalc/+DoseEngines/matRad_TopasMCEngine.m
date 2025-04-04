@@ -1225,6 +1225,7 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
                                         dij.mClusterDoseSecondary{ctScen}(:,d)      = sum(w) .* reshape(topasCubes.([topasCubesTallies{j} '_beam',num2str(d)]){ctScen},[],1);
                                     else
                                         dij.mClusterDose{ctScen}(:,d)               = sum(w) .* reshape(topasCubes.([topasCubesTallies{j} '_beam',num2str(d)]){ctScen},[],1);
+                                        dij.mClusterDose_Std{ctScen}(:,d)           = sum(w) .* reshape(topasCubes.([topasCubesTallies{j} '_batchStd_beam',num2str(d)]){ctScen},[],1);
                                     end
                                 end
                             else
