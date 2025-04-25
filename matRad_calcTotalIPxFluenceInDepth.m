@@ -97,8 +97,16 @@ for num = 1:length(spectraIdx)
     end
     
     %directoryMCTS           = 'C:\Users\s742o\Work\MCTS-DataBase-UCSF\MCTS-DataBase\MCTS-DataBase';
-    fileNameMCTSbaseData    = ['C:\Users\s742o\Work\MCTS-DataBase-UCSF\MCTS-DataBase\MCTS-DataBase', ...
-                                '\', particleName, '_', 'IonizationDetail', '_', typeIP, 'k.dat'];
+    %fileNameMCTSbaseData    = ['C:\Users\s742o\Work\MCTS-DataBase-UCSF\MCTS-DataBase\MCTS-DataBase', ...
+    %                            '\', particleName, '_', 'IonizationDetail', '_', typeIP, 'k.dat'];
+    
+    if strcmp(typeIP, 'F')
+    fileNameMCTSbaseData    = ['C:\Users\s742o\Work\MCTS-DataBase-UCSF\v2024\v2024', ...
+                                '\', particleName, '_', 'IonizationDetail', '_IDF', '.dat'];
+    elseif strcmp(typeIP, 'N')
+        fileNameMCTSbaseData    = ['C:\Users\s742o\Work\MCTS-DataBase-UCSF\v2024\v2024', ...
+                                '\', particleName, '_', 'IonizationDetail', '_IDM', '.dat'];
+    end
 
     % This could be substituted with directly reading from the already imported
     % IP table in .mat format.

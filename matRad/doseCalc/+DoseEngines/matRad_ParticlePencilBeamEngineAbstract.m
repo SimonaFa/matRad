@@ -822,8 +822,12 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
                 currFoci = energySigmaLUT(i,2);
                 sigmaIni = matRad_interp1(this.machine.data(energyIx).initFocus.dist(currFoci,:)',...
                     this.machine.data(energyIx).initFocus.sigma(currFoci,:)',...
-                    energySigmaLUT(i,3));
+                    energySigmaLUT(i,3));                
                 sigmaIni_sq = sigmaIni^2;
+
+                deltaSigmaIni = matRad_interp1(this.machine.data(energyIx).initFocus.dist(currFoci,:)',...
+                    grad(this.machine.data(energyIx).initFocus.sigma(currFoci,:)'),...
+                    energySigmaLUT(i,3));
 
                 % consider range shifter for protons if applicable
                 if  strcmp(this.machine.meta.radiationMode,'protons') && rangeShifterLUT(i).eqThickness > 0  && ~strcmp(this.machine.meta.machine,'Generic')
@@ -920,6 +924,7 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
                         bixel.ix = find(bixel.subRayIx);
                         bixel.radDepthOffset = 0;
                         bixel.addSigmaSq = 0;
+                        bixel.deltaSigmaIni = deltaSigmaIni;
                         
                         % calculate dose
                         bixel = this.calcParticleBixel(bixel);
