@@ -52,9 +52,11 @@ classdef matRad_ParticleHongPencilBeamEngine < DoseEngines.matRad_ParticlePencil
             kernels = this.interpolateKernelsInDepth(bixel);
             
             %correct sigmaInSq for divergence
+            %{
             if isfield(bixel,'deltaSigmaIni')
-                bixel.sigmaIniSq = bixel.sigmaIniSq + (bixel.deltaSigmaIni * bixel.radDepth).^2;            
+                bixel.sigmaIniSq = bixel.sigmaIniSq + (bixel.deltaSigmaIni .* bixel.radDepths).^2;            
             end
+            %}
 
             %Lateral Component
             switch this.lateralModel
