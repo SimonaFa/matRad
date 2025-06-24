@@ -12,7 +12,7 @@ classdef (Abstract) matRad_DoseEngineBase < handle
 %
 % This file is part of the matRad project. It is subject to the license
 % terms in the LICENSE file found in the top-level directory of this
-% distribution and at https://github.com/e0404/matRad/LICENSES.txt. No part
+% distribution and at https://github.com/e0404/matRad/LICENSE.md. No part
 % of the matRad project, including this file, may be copied, modified,
 % propagated, or distributed except according to the terms contained in the
 % LICENSE file.
@@ -33,7 +33,7 @@ classdef (Abstract) matRad_DoseEngineBase < handle
         multScen;                   % scenario model to use
         voxelSubIx;                 % selection of where to calculate / store dose, empty by default
         selectVoxelsInScenarios;    % which voxels to compute in robustness scenarios
-        bioParam;                   % Biological dose modeling
+        %bioModel;                   % name of the biological model
     end
     
     % Protected properties with public get access
@@ -43,14 +43,9 @@ classdef (Abstract) matRad_DoseEngineBase < handle
         timers;                 % timers of dose calc
 
         numOfColumnsDij;        % number of columns in the dij struct
-                                          
-        yCoordsV_vox;           % y-coordinate voxel
-        xCoordsV_vox;           % x-coordinate voxel
-        zCoordsV_vox;           % z-coordinate voxel
-        
-        yCoordsV_voxDoseGrid;   % converted voxel indices to real grid 
-        xCoordsV_voxDoseGrid;   % converted voxel indices to real grid
-        zCoordsV_voxDoseGrid;   % converted voxel indices to real grid
+                                    
+        voxWorldCoords;         % ct voxel coordinates in world
+        voxWorldCoordsDoseGrid; % dose grid voxel coordinates in world 
         
         %offset; % offset adjustment for isocenter
         
@@ -63,12 +58,18 @@ classdef (Abstract) matRad_DoseEngineBase < handle
         VdoseGridMask;  % voxel dose grid inside patient as logical mask
 
         robustVoxelsOnGrid; %voxels to be computed in robustness scenarios
+        
+        bioModel = 'None';                   % Biological dose modeling class
+        %bioProperties;
+        
+        cstDoseGrid;
     end
     
     % Fully protected properties
     properties (Access = protected)
         lastProgressUpdate;
         calcDoseDirect = false; % switch for direct cube / dij calculation
+        directWeights  = [];
     end
     
     properties (Constant)
@@ -113,20 +114,33 @@ classdef (Abstract) matRad_DoseEngineBase < handle
         function assignPropertiesFromPln(this,pln,warnWhenPropertyChanged)
             matRad_cfg = MatRad_Config.instance();
             
+            %Check radiation mode
+            if ~isfield(pln,'radiationMode') || ~any(strcmp(pln.radiationMode,this.possibleRadiationModes))
+                matRad_cfg.dispError('Invalid radiation mode for engine ''%s''!',this.name);
+            end
+
             %Set Scenario Model
             if isfield(pln,'multScen')
                 this.multScen = pln.multScen;
             end
             
-            %Assign biological model
-            if isfield(pln,'bioParam')
-                this.bioParam = pln.bioParam;
-            end
-            
             if nargin < 3 || ~isscalar(warnWhenPropertyChanged) || ~islogical(warnWhenPropertyChanged)
                 warnWhenPropertyChanged = false;
             end
+            
+            % Check older field name
+            if isfield(pln, 'bioParam') && ~isfield(pln, 'bioModel')
+                matRad_cfg.dispDeprecationWarning('Quantity pln.bioParam will be deprecated, use pln.bioModel instead');
+                pln.bioModel = pln.bioParam;
+            end
 
+            % Check whether the set field is already a bioModel or a struct
+            if ~isfield(pln, 'bioModel')
+                this.bioModel = 'none';
+            else
+                this.bioModel = pln.bioModel;
+            end
+            
             %Overwrite default properties within the engine with the ones
             %given in the propDoseCalc struct
             if isfield(pln,'propDoseCalc') && isstruct(pln.propDoseCalc)
@@ -152,11 +166,15 @@ classdef (Abstract) matRad_DoseEngineBase < handle
 
             % iterate over all fieldnames and try to set the
             % corresponding properties inside the engine
+            if matRad_cfg.isOctave
+                c2sWarningState = warning('off','Octave:classdef-to-struct');                
+            end
+            
             for i = 1:length(fields)
                 try
                     field = fields{i};
-                    if isprop(this,field)
-                        this.(field) = matRad_recursiveFieldAssignment(this.(field),plnStruct.(field),warningMsg);
+                    if matRad_ispropCompat(this,field)
+                        this.(field) = matRad_recursiveFieldAssignment(this.(field),plnStruct.(field),true,warningMsg);
                     else
                         matRad_cfg.dispWarning('Not able to assign property ''%s'' from pln.propDoseCalc to Dose Engine!',field);
                     end
@@ -177,9 +195,54 @@ classdef (Abstract) matRad_DoseEngineBase < handle
                     end
                 end
             end
+            
+            if matRad_cfg.isOctave
+                warning(c2sWarningState.state,'Octave:classdef-to-struct');                
+            end
         end
     
-              
+        function assignBioModelPropertiesFromPln(this, plnModel, warnWhenPropertyChanged)
+
+
+            matRad_cfg = MatRad_Config.instance();
+            
+            fields = fieldnames(plnModel);
+            
+            %Set up warning message
+            if warnWhenPropertyChanged
+                warningMsg = 'Property in Biological Model overwritten from pln.bioModel';
+            else
+                warningMsg = '';
+            end
+
+            % iterate over all fieldnames and try to set the
+            % corresponding properties inside the engine
+            for i = 1:length(fields)
+                try
+                    field = fields{i};
+                    if isprop(this.bioModel,field)
+                        this.bioModel.(field) = matRad_recursiveFieldAssignment(this.bioModel.(field),plnModel.(field),warningMsg);
+                    else
+                        matRad_cfg.dispWarning('Not able to assign property ''%s'' from pln.bioModel to Biological Model!',field);
+                    end
+                catch ME
+                % catch exceptions when the engine has no properties,
+                % which are defined in the struct.
+                % When defining an engine with custom setter and getter
+                % methods, custom exceptions can be caught here. Be
+                % careful with Octave exceptions!
+                    if ~isempty(warningMsg)
+                        matRad_cfg = MatRad_Config.instance();
+                        switch ME.identifier
+                            case 'MATLAB:noPublicFieldForClass'
+                                matRad_cfg.dispWarning('Not able to assign property from pln.bioModel to Biological Model: %s',ME.message);
+                            otherwise
+                                matRad_cfg.dispWarning('Problem while setting up Biological Model from struct:%s %s',field,ME.message);
+                        end
+                    end
+                end
+            end
+        end
         
         function resultGUI = calcDoseForward(this,ct,cst,stf,w)
             matRad_cfg = MatRad_Config.instance();
@@ -189,7 +252,7 @@ classdef (Abstract) matRad_DoseEngineBase < handle
 
             % copy bixel weight vector into stf struct
             if nargin == 5
-                if sum([stf.totalNumOfBixels]) ~= numel(w)
+                if sum([stf.totalNumOfBixels]) ~= numel(w) && ~isfield([stf.ray],'shapes')
                     matRad_cfg.dispError('weighting does not match steering information');
                 end
                 counter = 0;
@@ -215,12 +278,28 @@ classdef (Abstract) matRad_DoseEngineBase < handle
             end            
             
             %Set direct dose calculation and compute "dij"
+            this.directWeights = w;
             this.calcDoseDirect = true;
             dij = this.calcDose(ct,cst,stf);
 
             % calculate cubes; use uniform weights here, weighting with actual fluence 
             % already performed in dij construction
-            resultGUI    = matRad_calcCubes(ones(dij.numOfBeams,1),dij);
+            
+            resultGUI = [];
+
+            if ~isa(this.multScen,'matRad_ScenarioModel')
+                this.multScen = matRad_ScenarioModel.create(this.multScen,struct('numOfCtScen',ct.numOfCtScen));
+            end
+            
+            for i = 1:this.multScen.totNumScen
+                scenSubIx = this.multScen.linearMask(i,:);
+                resultGUItmp = matRad_calcCubes(ones(dij.numOfBeams,1),dij,this.multScen.sub2scenIx(scenSubIx(1),scenSubIx(2),scenSubIx(3)));
+                if i == 1
+                    resultGUI = resultGUItmp;
+                end
+                resultGUI = matRad_appendResultGUI(resultGUI,resultGUItmp,false,sprintf('scen%d',i));                
+            end
+
             resultGUI.w  = w; 
         end
 
@@ -246,7 +325,7 @@ classdef (Abstract) matRad_DoseEngineBase < handle
         % Should be called at the beginning of calcDose method.
         % Can be expanded or changed by overwriting this method and calling
         % the superclass method inside of it
-        [dij,ct,cst,stf] = initDoseCalc(this,ct,cst,stf)   
+        dij = initDoseCalc(this,ct,cst,stf)   
         
         % method for finalizing the dose calculation (e.g. postprocessing
         % on dij or files
@@ -345,6 +424,14 @@ classdef (Abstract) matRad_DoseEngineBase < handle
         % Currently just uses the matRad function that asks for pln
         function machine = loadMachine(radiationMode,machineName)
             machine = matRad_loadMachine(struct('radiationMode',radiationMode,'machine',machineName));
+        end
+        
+        %Used to check against a machine file if a specific quantity can be
+        %computed. Needs to be overriden in subclasses if additional
+        %quantities are available.
+        function q = providedQuantities(machine)
+            %A dose engine will, by definition, return dose
+            q{1} = 'physicalDose';
         end
     end
 end

@@ -7,7 +7,7 @@ classdef matRad_VariableRBEProjection < matRad_EffectProjection
 % 
 % This file is part of the matRad project. It is subject to the license 
 % terms in the LICENSE file found in the top-level directory of this 
-% distribution and at https://github.com/e0404/matRad/LICENSES.txt. No part 
+% distribution and at https://github.com/e0404/matRad/LICENSE.md. No part 
 % of the matRad project, including this file, may be copied, modified, 
 % propagated, or distributed except according to the terms contained in the 
 % LICENSE file.
@@ -18,42 +18,50 @@ classdef matRad_VariableRBEProjection < matRad_EffectProjection
         function obj = matRad_VariableRBEProjection()
         end
         
-        function RBExD = computeSingleScenario(obj,dij,scen,w)
+        function RBExDose = computeSingleScenario(obj,dij,scen,w)
             effect = computeSingleScenario@matRad_EffectProjection(obj,dij,scen,w); %First compute effect
-            RBExD = zeros(dij.doseGrid.numOfVoxels,1);
-            [ctScen,~] = ind2sub(size(dij.physicalDose),scen);
-            RBExD(dij.ixDose{ctScen}) = sqrt((effect(dij.ixDose{ctScen})./dij.bx{ctScen}(dij.ixDose{ctScen}))+(dij.gamma{ctScen}(dij.ixDose{ctScen}).^2)) - dij.gamma{ctScen}(dij.ixDose{ctScen});
+            RBExDose = zeros(dij.doseGrid.numOfVoxels,1);
+            [ctScen,~,~] = ind2sub(size(dij.physicalDose),scen); %TODO: Workaround for now
+            RBExDose(dij.ixDose{ctScen}) = sqrt((effect(dij.ixDose{ctScen})./dij.bx{ctScen}(dij.ixDose{ctScen}))+(dij.gamma{ctScen}(dij.ixDose{ctScen}).^2)) - dij.gamma{ctScen}(dij.ixDose{ctScen});
         end
         
         function wGrad = projectSingleScenarioGradient(obj,dij,doseGrad,scen,w)
-            if isempty(dij.mAlphaDose{scen}) || isempty(dij.mSqrtBetaDose{scen})
-                wGrad = [];
-                matRad_cfg = MatRad_Config.instance();
-                matRad_cfg.dispWarning('Empty scenario in optimization detected! This should not happen...\n');
+            %While the dose cache should be up to date here, we ask for
+            %a computation (will skip if weights are equal to cache)
+            obj = obj.compute(dij,w);
+
+            %Get corresponding ct scenario
+            [ctScen,~,~] = ind2sub(size(dij.physicalDose),scen); %TODO: Workaround for now
+
+            %Scaling vor variable RBExDose
+            scaledEffect = obj.d{scen} + dij.gamma{ctScen};
+            doseGradTmp = zeros(dij.doseGrid.numOfVoxels,1);
+            doseGradTmp(dij.ixDose{ctScen}) = doseGrad{scen}(dij.ixDose{ctScen}) ./ (2*dij.bx{ctScen}(dij.ixDose{ctScen}).*scaledEffect(dij.ixDose{ctScen}));
+
+            %Now modify the effect computation
+            if isfield(dij,'mAlphaDose') && isfield(dij,'mSqrtBetaDose')
+                if isempty(dij.mAlphaDose{scen}) || isempty(dij.mSqrtBetaDose{scen})
+                    wGrad = [];
+                    matRad_cfg = MatRad_Config.instance();
+                    matRad_cfg.dispWarning('Empty scenario in optimization detected! This should not happen...\n');
+                    return;
+                else
+                    vBias = (doseGrad{scen}' * dij.mAlphaDose{scen})';
+                    quadTerm = dij.mSqrtBetaDose{scen} * w;
+                    mPsi = (2*(doseGrad{scen}.*quadTerm)' * dij.mSqrtBetaDose{scen})';
+                    wGrad = vBias + mPsi;
+                end
             else
-                %While the dose cache should be up to date here, we ask for
-                %a computation (will skip if weights are equal to cache)
-                obj = obj.compute(dij,w);
-                
-                %Get corresponding ct scenario
-                [ctScen,~] = ind2sub(size(dij.physicalDose),scen);
-                
-                %Scaling vor variable RBExD
-                scaledEffect = obj.d{scen} + dij.gamma{ctScen};
-                doseGradTmp = zeros(dij.doseGrid.numOfVoxels,1);
-                doseGradTmp(dij.ixDose{ctScen}) = doseGrad{scen}(dij.ixDose{ctScen}) ./ (2*dij.bx{ctScen}(dij.ixDose{ctScen}).*scaledEffect(dij.ixDose{ctScen}));
-                
-                %Now modify the effect computation
-                vBias = (doseGradTmp' * dij.mAlphaDose{scen})';
-                quadTerm = dij.mSqrtBetaDose{scen} * w;
-                mPsi = (2*(doseGradTmp.*quadTerm)' * dij.mSqrtBetaDose{scen})';
-                wGrad = vBias + mPsi;
+                vBias = ((dij.ax{ctScen} .* doseGradTmp)' * dij.physicalDose{scen})';
+                tmpDose = (dij.physicalDose{scen}*w);
+                mPsi = (2*(doseGrad{scen}.*tmpDose.*dij.bx{ctScen})' * dij.physicalDose{scen})';                
             end
+            wGrad = vBias + mPsi;
         end
         
-        function [RBExDexp,dOmegaV] = computeSingleScenarioProb(~,dij,scen,w)
+        function [RBExDoseexp,dOmegaV] = computeSingleScenarioProb(~,dij,scen,w)
             if isempty(dij.mAlphaDoseExp{scen}) || isempty(dij.mSqrtBetaDoseExp{scen})
-                RBExDexp = [];
+                RBExDoseexp = [];
                 dOmegaV = [];
                 %matRad_cfg = MatRad_Config.instance();
                 %matRad_cfg.dispWarning('Empty scenario in optimization detected! This should not happen...\n');
@@ -65,10 +73,10 @@ classdef matRad_VariableRBEProjection < matRad_EffectProjection
                 eExp = eExpLinTerm + eExpSqTerm.^2;
                 
                 %Get corresponding ct scenario
-                 [ctScen,~] = ind2sub(size(dij.physicalDose),scen);
+                [ctScen,~,~] = ind2sub(size(dij.physicalDose),scen);%TODO: Workaround for now
 
-                RBExDexp = zeros(dij.doseGrid.numOfVoxels,1);
-                RBExDexp(dij.ixDose{ctScen}) = sqrt((eExp(dij.ixDose{ctScen})./dij.bx{ctScen}(dij.ixDose{ctScen}))+(dij.gamma{ctScen}(dij.ixDose{ctScen}).^2)) - dij.gamma{ctScen}(dij.ixDose{ctScen});
+                RBExDoseexp = zeros(dij.doseGrid.numOfVoxels,1);
+                RBExDoseexp(dij.ixDose{ctScen}) = sqrt((eExp(dij.ixDose{ctScen})./dij.bx{ctScen}(dij.ixDose{ctScen}))+(dij.gamma{ctScen}(dij.ixDose{ctScen}).^2)) - dij.gamma{ctScen}(dij.ixDose{ctScen});
                 
                 for i = 1:size(dij.physicalDoseOmega,2)
                    dOmegaV{scen,i} = dij.mAlphaDoseOmega{scen,i} * w;
@@ -85,9 +93,9 @@ classdef matRad_VariableRBEProjection < matRad_EffectProjection
                 obj = obj.compute(dij,w);
 
                 %Get corresponding ct scenario
-                [ctScen,~]= ind2sub(size(dij.physicalDose),scen);
+                [ctScen,~,~] = ind2sub(size(dij.physicalDose),scen);%TODO: Workaround for now
                 
-                %Scaling vor variable RBExD
+                %Scaling vor variable RBExDose
                 scaledEffect = obj.dExp{scen} + dij.gamma{ctScen};
                 doseGradTmp = zeros(dij.doseGrid.numOfVoxels,1);
                 doseGradTmp(dij.ixDose{ctScen}) = dExpGrad{scen}(dij.ixDose{ctScen}) ./ (2*dij.bx{ctScen}(dij.ixDose{ctScen}).*scaledEffect(dij.ixDose{ctScen}));

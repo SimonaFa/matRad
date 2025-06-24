@@ -41,6 +41,7 @@ classdef matRad_PhotonPencilBeamSVDEngine < DoseEngines.matRad_PencilBeamEngineA
 
         enableDijSampling = true;
         dijSampling;                    %struct with lateral dij sampling parameters
+        ignoreInvalidValues = false;    %ignore negative, infinite or NaN values in bixel calculation
     end
 
     %Calculation variables
@@ -92,11 +93,19 @@ classdef matRad_PhotonPencilBeamSVDEngine < DoseEngines.matRad_PencilBeamEngineA
             % create this from superclass
             this = this@DoseEngines.matRad_PencilBeamEngineAbstract(pln);            
 
-            if nargin > 0 && isfield(pln,'propStf') && isfield(pln.propStf,'bixelWidth')
-                % 0 if field calc is bixel based, 1 if dose calc is field based
-                % num2str is only used to prevent failure of strcmp when bixelWidth
-                % contains a number and not a string
-                this.isFieldBasedDoseCalc = strcmp(num2str(pln.propStf.bixelWidth),'field');
+            %TODO: engines should not rely on reading properties from "propStf", we need to find another way to handle those two fields in the future.
+            if nargin > 0 && isfield(pln,'propStf') 
+                if isfield(pln.propStf,'bixelWidth')
+                    % 0 if field calc is bixel based, 1 if dose calc is field based
+                    % num2str is only used to prevent failure of strcmp when bixelWidth
+                    % contains a number and not a string
+                    this.isFieldBasedDoseCalc = strcmp(num2str(pln.propStf.bixelWidth),'field');
+                end
+
+                %Potentially stored collimation information
+                if isfield(pln.propStf,'collimation')
+                    this.collimation = pln.propStf.collimation;
+                end
             end
         end
 
@@ -294,7 +303,8 @@ classdef matRad_PhotonPencilBeamSVDEngine < DoseEngines.matRad_PencilBeamEngineA
                     currRay.radDepths,...
                     currRay.geoDepths,...
                     currRay.isoLatDists(:,1),...
-                    currRay.isoLatDists(:,2));
+                    currRay.isoLatDists(:,2),...
+                    this.ignoreInvalidValues);
 
                 % sample dose only for bixel based dose calculation
                 if this.enableDijSampling && ~this.isFieldBasedDoseCalc
@@ -357,7 +367,7 @@ classdef matRad_PhotonPencilBeamSVDEngine < DoseEngines.matRad_PencilBeamEngineA
             %
             % This file is part of the matRad project. It is subject to the license
             % terms in the LICENSE file found in the top-level directory of this
-            % distribution and at https://github.com/e0404/matRad/LICENSES.txt. No part
+            % distribution and at https://github.com/e0404/matRad/LICENSE.md. No part
             % of the matRad project, including this file, may be copied, modified,
             % propagated, or distributed except according to the terms contained in the
             % LICENSE file.
@@ -528,7 +538,7 @@ classdef matRad_PhotonPencilBeamSVDEngine < DoseEngines.matRad_PencilBeamEngineA
         end
 
         function bixelDose = calcSingleBixel(SAD,m,betas,interpKernels,...
-                radDepths,geoDists,isoLatDistsX,isoLatDistsZ)
+                radDepths,geoDists,isoLatDistsX,isoLatDistsZ,ignoreInvalidValues)
             % matRad photon dose calculation for an individual bixel
             %   This is defined as a static function so it can also be
             %   called individually for certain applications without having
@@ -560,6 +570,10 @@ classdef matRad_PhotonPencilBeamSVDEngine < DoseEngines.matRad_PencilBeamEngineA
             %   [1] http://www.ncbi.nlm.nih.gov/pubmed/8497215
             %
 
+            if nargin < 9
+                ignoreInvalidValues = false;
+            end
+
             % Compute depth dose components according to [1, eq. 17]
             doseComponent = betas./(betas-m) .* (exp(-m*radDepths) - exp(-betas.*radDepths));
 
@@ -579,9 +593,11 @@ classdef matRad_PhotonPencilBeamSVDEngine < DoseEngines.matRad_PencilBeamEngineA
             % check if we have valid dose values and adjust numerical instabilities
             % from fft convolution
             bixelDose(bixelDose < 0 & bixelDose > -1e-14) = 0;
-            if any(isnan(bixelDose)) || any(bixelDose<0)
+            if ~ignoreInvalidValues && any(isnan(bixelDose) | bixelDose<0)
                 matRad_cfg = MatRad_Config.instance();
-                matRad_cfg.dispError('Invalid numerical values in photon dose calculation.');
+                matRad_cfg.dispError([ ...
+                    'Invalid numerical values in photon dose calculation.\n' ...
+                    'Check your kernel or set ignoreInvalidValues to true.']);
             end
         end
 

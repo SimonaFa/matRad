@@ -124,9 +124,9 @@ for i = 1:length(pln.propStf.gantryAngles)
     stf(i).totalNumOfBixels     = 1;
     stf(i).machine              = pln.machine;
     
-    x = floor(matRad_interp1(xVox,[1:ct.cubeDim(2)]',stf.isoCenter(1)));
-    y = floor(matRad_interp1(yVox,[1:ct.cubeDim(1)]',stf.isoCenter(2)));
-    z = floor(matRad_interp1(zVox,[1:ct.cubeDim(3)]',stf.isoCenter(3)));
+    x = floor(matRad_interp1(xVox',[1:ct.cubeDim(2)]',stf.isoCenter(1)));
+    y = floor(matRad_interp1(yVox',[1:ct.cubeDim(1)]',stf.isoCenter(2)));
+    z = floor(matRad_interp1(zVox',[1:ct.cubeDim(3)]',stf.isoCenter(3)));
     
     %Voxel index of Isocenter
     isoIx = [y x z];

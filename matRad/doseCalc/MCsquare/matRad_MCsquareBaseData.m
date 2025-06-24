@@ -8,7 +8,7 @@ classdef matRad_MCsquareBaseData < matRad_MCemittanceBaseData
     %
     % This file is part of the matRad project. It is subject to the license
     % terms in the LICENSE file found in the top-level directory of this
-    % distribution and at https://github.com/e0404/matRad/LICENSES.txt. No part
+    % distribution and at https://github.com/e0404/matRad/LICENSE.md. No part
     % of the matRad project, including this file, may be copied, modified,
     % propagated, or distributed except according to the terms contained in the
     % LICENSE file.
@@ -47,7 +47,6 @@ classdef matRad_MCsquareBaseData < matRad_MCemittanceBaseData
                 fileID = fopen(filepath,'w');
                 
                 %Header
-                %fprintf(fileID,'--matRad: Beam Model for machine %s (%s)--\n',machine.meta.machine,machine.meta.dataType);
                 fprintf(fileID,'--UPenn beam model (double gaussian)--\n');
                 fprintf(fileID,'# %s\n', obj.machine.meta.description);
                 fprintf(fileID,'# created by %s on %s\n\n', obj.machine.meta.created_by, obj.machine.meta.created_on);

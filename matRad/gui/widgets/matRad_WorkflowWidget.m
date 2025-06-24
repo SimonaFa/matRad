@@ -12,7 +12,7 @@ classdef matRad_WorkflowWidget < matRad_Widget
     % 
     % This file is part of the matRad project. It is subject to the license 
     % terms in the LICENSE file found in the top-level directory of this 
-    % distribution and at https://github.com/e0404/matRad/LICENSES.txt. No part 
+    % distribution and at https://github.com/e0404/matRad/LICENSE.md. No part 
     % of the matRad project, including this file, may be copied, modified, 
     % propagated, or distributed except according to the terms contained in the 
     % LICENSE file.
@@ -20,6 +20,7 @@ classdef matRad_WorkflowWidget < matRad_Widget
     % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
     properties
+        savedResultTag = {};
     end        
     
     methods
@@ -243,11 +244,22 @@ classdef matRad_WorkflowWidget < matRad_Widget
         end
         
         function this = doUpdate(this,evt)
-            getFromWorkspace(this);
-            %updateInWorkspace(this);
+            %If the pln was changed, we do not do a consistency check (or
+            %at least we do not throw a warning when it is inconsistent)
+            if nargin < 2 || any(strcmp(evt.changedVariables,'pln'))
+                noCheck = true;
+            else
+                noCheck = false;
+            end
+            this.getFromWorkspace(noCheck);            
         end      
         
-        function this = getFromWorkspace(this)
+        function this = getFromWorkspace(this,noCheck)
+
+            if nargin < 2
+                noCheck = false;
+            end
+
             handles = this.handles;
             matRad_cfg = MatRad_Config.instance();
             % no data loaded, disable the buttons
@@ -277,27 +289,31 @@ classdef matRad_WorkflowWidget < matRad_Widget
                     % check if stf exists
                     if evalin('base','exist(''stf'')') 
                         % check if dij, stf and pln match
-                       [allMatch, msg] = matRad_comparePlnStf(evalin('base','pln'),evalin('base','stf'));
-                        if allMatch
+                       [plnStfMatch, msg] = matRad_comparePlnStf(evalin('base','pln'),evalin('base','stf'));
+                        if plnStfMatch
                             % plan is ready for optimization
                             set(handles.txtInfo,'String','ready for dose calculation');
                             set(handles.btnOptimize ,'Enable','on');
-                        else 
+                        elseif ~noCheck 
                             this.showWarning(msg);
+                        else
+                            %Nothing
+                        end
+
+                        % check if dij exist
+                        if evalin('base','exist(''dij'')') && plnStfMatch && ~evalin('base','pln.propOpt.conf3D')
+                            [dijStfMatch, msg] = matRad_compareDijStf(evalin('base','dij'),evalin('base','stf'));
+                            if dijStfMatch
+                                set(handles.txtInfo,'String','ready for optimization');
+                                set(handles.btnOptimize ,'Enable','on');
+                            elseif ~noCheck 
+                                this.showWarning(msg);
+                            else
+                                %Nothing
+                            end
                         end
                         
                     end
-                    % check if dij exist
-                    if evalin('base','exist(''dij'')') && evalin('base','exist(''stf'')') 
-                        [allMatch, msg] = matRad_compareDijStf(evalin('base','stf'),evalin('base','dij'));
-                        if allMatch
-                            set(handles.txtInfo,'String','ready for optimization');
-                            set(handles.btnOptimize ,'Enable','on');
-                        else
-                            this.showWarning(msg);
-                        end
-                    end
-                    
 
                     % does resultGUI exist
                     if evalin('base','exist(''resultGUI'')')
@@ -398,7 +414,11 @@ classdef matRad_WorkflowWidget < matRad_Widget
             % carry out dose calculation
             try
                 dij = matRad_calcDoseInfluence(evalin('base','ct'),evalin('base','cst'),stf,pln);
-                               
+                
+                % prepare dij for 3d conformal
+                if isfield(pln.propOpt,'conf3D') && pln.propOpt.conf3D
+                   dij = matRad_collapseDij(dij);
+                end
                 % assign results to base worksapce
                 assignin('base','dij',dij);
                 
@@ -450,21 +470,20 @@ classdef matRad_WorkflowWidget < matRad_Widget
                 AllVarNames = evalin('base','who');
                 if  ismember('resultGUI',AllVarNames)
                     resultGUI = evalin('base','resultGUI');
-                    sNames = fieldnames(resultGUIcurrentRun);
                     oldNames = fieldnames(resultGUI);
-                    if(length(oldNames) > length(sNames))
+
+                    if ~isempty(this.savedResultTag)
                         for j = 1:length(oldNames)
-                            if strfind(oldNames{j}, 'beam')
-                                resultGUI = rmfield(resultGUI, oldNames{j});
+                            for k = 1:length(this.savedResultTag)
+                                if ~isempty(strfind(oldNames{j}, this.savedResultTag{k}))
+                                    resultGUIcurrentRun.(oldNames{j}) = resultGUI.(oldNames{j});
+                                end
                             end
                         end
-                    end
-                    for j = 1:length(sNames)
-                        resultGUI.(sNames{j}) = resultGUIcurrentRun.(sNames{j});
-                    end
-                else
-                    resultGUI = resultGUIcurrentRun;
+                    end                
                 end
+
+                resultGUI = resultGUIcurrentRun;
 
                 assignin('base','resultGUI',resultGUI);
 
@@ -605,10 +624,14 @@ classdef matRad_WorkflowWidget < matRad_Widget
                 % delete old variables to avoid confusion
                 if isfield(resultGUI,'effect')
                     resultGUI = rmfield(resultGUI,'effect');
-                    resultGUI = rmfield(resultGUI,'RBExD');
+                    resultGUI = rmfield(resultGUI,'RBExDose');
                     resultGUI = rmfield(resultGUI,'RBE');
                     resultGUI = rmfield(resultGUI,'alpha');
                     resultGUI = rmfield(resultGUI,'beta');
+                end
+
+                if isfield(resultGUI,'LET')
+                    resultGUI = rmfield(resultGUI,'LET');
                 end
                 
                 % overwrite the "standard" fields
@@ -669,15 +692,29 @@ classdef matRad_WorkflowWidget < matRad_Widget
                     'Style','text',...
                     'Position',[20 Height - (0.35*Height) 350 60],...
                     'String','Please provide a decriptive name for your optimization result:','FontSize',10,'BackgroundColor',[0.5 0.5 0.5]);
+
+                try 
+                    pln = evalin('base','pln');
+                    numOfBeams = pln.propStf.numOfBeams;
+                    radMode = pln.radiationMode;
+                    fractions = pln.numOfFractions;
+
+                    saveString = sprintf('%s_%dbeams_%dfrac',radMode,numOfBeams,fractions);
+                catch
+                    saveString = datestr(now,'mmddyyHHMM');
+                end
                 
-                uicontrol('Parent',figDialog,...
+                hFocus = uicontrol('Parent',figDialog,...
                     'Style','edit',...
                     'Position',[30 60 350 60],...
-                    'String','Please enter name here...','FontSize',10,'BackgroundColor',[0.55 0.55 0.55]);
+                    'String',saveString,'FontSize',10,'BackgroundColor',[0.55 0.55 0.55],...
+                    'Callback', @(hpb,eventdata)SaveResultToGUI(this,hpb,eventdata));
                 
                 uicontrol('Parent', figDialog,'Style', 'pushbutton', 'String', 'Save','FontSize',10,...
                     'Position', [0.42*Width 0.1 * Height 70 30],...
                     'Callback', @(hpb,eventdata)SaveResultToGUI(this,hpb,eventdata));
+
+                uicontrol(hFocus);
             end
             
             uiwait(figDialog);
@@ -690,17 +727,13 @@ classdef matRad_WorkflowWidget < matRad_Widget
             ixHandle      = strcmp(get(AllFigHandles,'Name'),'Provide result name');
             uiEdit        = get(AllFigHandles(ixHandle),'Children');
             
-            if strcmp(get(uiEdit(2),'String'),'Please enter name here...')
-                
-                formatOut = 'mmddyyHHMM';
-                Suffix = ['_' datestr(now,formatOut)];
-            else
-                % delete special characters
-                Suffix = get(uiEdit(2),'String');
-                logIx = isstrprop(Suffix,'alphanum');
-                Suffix = ['_' Suffix(logIx)];
-            end
             
+            % delete special characters
+            Suffix = get(uiEdit(2),'String');
+            logIx = isstrprop(Suffix,'alphanum');
+            Suffix = ['_' Suffix(logIx)];
+            this.savedResultTag{end+1}= Suffix;
+
             pln       = evalin('base','pln');
             resultGUI = evalin('base','resultGUI');
             
@@ -710,12 +743,16 @@ classdef matRad_WorkflowWidget < matRad_Widget
             if isfield(resultGUI,'w')
                 resultGUI.(['w' Suffix])             = resultGUI.w;
             end
+
+            if isfield(resultGUI,'LET')
+                resultGUI.(['LET' Suffix])  = resultGUI.LET;
+            end
             
             
-            if ~strcmp(pln.propOpt.bioOptimization,'none')
+            if isfield(pln,'propOpt') && ~strcmp(pln.propOpt.quantityOpt,'none')
                 
-                if isfield(resultGUI,'RBExD')
-                    resultGUI.(['RBExD' Suffix]) = resultGUI.RBExD;
+                if isfield(resultGUI,'RBExDose')
+                    resultGUI.(['RBExDose' Suffix]) = resultGUI.RBExDose;
                 end
                 
                 if strcmp(pln.radiationMode,'carbon') == 1
@@ -846,12 +883,12 @@ classdef matRad_WorkflowWidget < matRad_Widget
             [statusmsg,statusflag] = usedOptimizer.GetStatus();
             
             if statusflag == 0 || statusflag == 1
-                status = 'none';
+                statusIcon = 'none';
             else
-                status = 'warn';
+                statusIcon = 'warn';
             end
             
-            msgbox(['Optimizer finished with status ' num2str(statusflag) ' (' statusmsg ')'],'Optimizer',status,'modal');
+            this.showMessage(sprintf('Optimizer finished with status %d (%s)',statusflag,statusmsg),'Optimization finished!',statusIcon,'modal');
         end
     end
 end

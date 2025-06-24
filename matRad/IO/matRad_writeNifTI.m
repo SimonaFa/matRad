@@ -55,10 +55,17 @@ if ~isfield(metadata,'compress') || ~islogical(metadata.compress)
     metadata.compress = true;
 end  
 
-info.PixelDimensions = [metadata.resolution];
+%Default Matlab Axis Permuation
+metadata.axisPermutation = [2 1 3];
+cube = permute(cube,metadata.axisPermutation);
+
+info.PixelDimensions = [metadata.resolution(metadata.axisPermutation)];
 info.Datatype = metadata.datatype;
 info.ImageSize = size(cube);
 info.Description = sprintf('Exported from matRad %s',matRad_version());
+if length(info.Description) >= 80
+    info.Description = info.Description(1:79);
+end
 
 if max(info.ImageSize) > 32767
     info.Version = 'NIfTI2';
@@ -77,10 +84,8 @@ info.SpatialDimension = 0;
 %Set up Transform Matrix
 info.TransformName = 'Sform';
 
-T=zeros(4);
-ixOnes = sub2ind([4 4],metadata.axisPermutation,[1 2 3]);
-T(ixOnes) = 1;
-T(4,4) = 1;
+T=eye(4);
+
 
 %Correct for coordinate system
 switch metadata.coordinateSystem

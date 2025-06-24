@@ -25,7 +25,7 @@ function [caSampRes, mSampDose, pln, resultGUInomScen]  = matRad_sampling(ct,stf
 %
 % This file is part of the matRad project. It is subject to the license
 % terms in the LICENSE file found in the top-level directory of this
-% distribution and at https://github.com/e0404/matRad/LICENSES.txt. No part
+% distribution and at https://github.com/e0404/matRad/LICENSE.md. No part
 % of the matRad project, including this file, may be copied, modified,
 % propagated, or distributed except according to the terms contained in the
 % LICENSE file.
@@ -50,13 +50,7 @@ end
 if exist('multScen','var') && ~isempty(multScen)
     pln.multScen = multScen;
 else
-    % create random scenarios for sampling
-    % Deprecated Code
-    %pln.multScen = matRad_multScen(ctSamp,'rndScen'); % 'impSamp' or 'wcSamp'
-    %pln.multScen.numOfShiftScen = matRad_cfg.defaults.samplingScenarios * ones(3,1);
-    %pln.multScen.numOfRangeShiftScen = matRad_cfg.defaults.samplingScenarios;
-    %pln.multScen.totNumScen = matRad_cfg.defaults.samplingScenarios; %This yields an error now
-
+    % create random scenarios for sampling   
     pln.multScen = matRad_RandomScenarios(ctSamp);
     pln.multScen.nSamples = matRad_cfg.defaults.samplingScenarios;
 end
@@ -98,7 +92,12 @@ try
     if ~FlagParallToolBoxLicensed
         matRad_cfg.dispWarning('Could not check out parallel computing toolbox. \n');
     end
+    % Create parallel pool on cluster
+    p = gcp(); % If no pool, create new one.
 
+    if isempty(p)
+        matRad_cfg.dispError('matRad: Could not start valid parallel pool. Please check your parallel computing toolbox installation. \n');
+    end
 catch
     FlagParallToolBoxLicensed  = false;
 end
@@ -110,20 +109,20 @@ nomScenTime      = toc(nomScenTimer);
 matRad_cfg.dispInfo('Finished nominal Scenario Calculation. Computation time: %f h \n',round(nomScenTime / 3600));
 
 refVol = [2 5 50 95 98];
-refGy = linspace(0,max(resultGUInomScen.(pln.bioParam.quantityVis)(:)),6);
+if isfield(resultGUInomScen,'RBExDose'), quantityVis  = 'RBExDose'; else,  quantityVis = 'physicalDose';  end
 
-resultGUInomScen.dvh = matRad_calcDVH(cst,resultGUInomScen.(pln.bioParam.quantityVis),'cum');
+refGy = linspace(0,max(resultGUInomScen.(quantityVis)(:)),6);
+
+resultGUInomScen.dvh = matRad_calcDVH(cst,resultGUInomScen.(quantityVis),'cum');
 dvhPoints            = resultGUInomScen.dvh(1).doseGrid;
-nomQi                = matRad_calcQualityIndicators(cst,pln,resultGUInomScen.(pln.bioParam.quantityVis),refGy,refVol);
+nomQi                = matRad_calcQualityIndicators(cst,pln,resultGUInomScen.(quantityVis),refGy,refVol);
 
 resultGUInomScen.qi  = nomQi;
 resultGUInomScen.cst = cst;
 
 %% perform parallel sampling
 if FlagParallToolBoxLicensed
-    % Create parallel pool on cluster
-    p = gcp(); % If no pool, create new one.
-
+    
     if isempty(p)
         poolSize = 1;
     else
@@ -158,15 +157,18 @@ if FlagParallToolBoxLicensed
         plnSamp.multScen = pln.multScen.extractSingleScenario(i);
 
         resultSamp                 = matRad_calcDoseForward(ct,cst,stf,plnSamp,w);
-        sampledDose                = resultSamp.(pln.bioParam.quantityVis)(subIx);
+        
+        if isfield(resultSamp,'RBExDose'), quantityVis  = 'RBExDose'; else,  quantityVis = 'physicalDose';  end
+        
+        sampledDose                = resultSamp.(quantityVis)(subIx);
         mSampDose(:,i)             = single(reshape(sampledDose,[],1));
-        caSampRes(i).bioParam      = pln.bioParam;
+        caSampRes(i).bioModel      = pln.bioModel;
         caSampRes(i).relRangeShift = plnSamp.multScen.relRangeShift;
         caSampRes(i).absRangeShift = plnSamp.multScen.absRangeShift;
         caSampRes(i).isoShift      = plnSamp.multScen.isoShift;
 
-        caSampRes(i).dvh = matRad_calcDVH(cst,resultSamp.(pln.bioParam.quantityVis),'cum',dvhPoints);
-        caSampRes(i).qi  = matRad_calcQualityIndicators(cst,pln,resultSamp.(pln.bioParam.quantityVis),refGy,refVol);
+        caSampRes(i).dvh = matRad_calcDVH(cst,resultSamp.(quantityVis),'cum',dvhPoints);
+        caSampRes(i).qi  = matRad_calcQualityIndicators(cst,pln,resultSamp.(quantityVis),refGy,refVol);
 
         if FlagParforProgressDisp & logLevel > 2
             parfor_progress;
@@ -195,15 +197,18 @@ else
         plnSamp.multScen = pln.multScen.extractSingleScenario(i);
 
         resultSamp                 = matRad_calcDoseDirect(ct,stf,plnSamp,cst,w);
-        sampledDose                = resultSamp.(pln.bioParam.quantityVis)(subIx);
+
+        if isfield(resultSamp,'RBExDose'), quantityVis  = 'RBExDose'; else,  quantityVis = 'physicalDose';  end
+
+        sampledDose                = resultSamp.(quantityVis)(subIx);
         mSampDose(:,i)             = single(reshape(sampledDose,[],1));
-        caSampRes(i).bioParam      = pln.bioParam;
+        caSampRes(i).bioModel      = pln.bioModel;
         caSampRes(i).relRangeShift = plnSamp.multScen.relRangeShift;
         caSampRes(i).absRangeShift = plnSamp.multScen.absRangeShift;
         caSampRes(i).isoShift      = plnSamp.multScen.isoShift;
 
-        caSampRes(i).dvh = matRad_calcDVH(cst,resultSamp.(pln.bioParam.quantityVis),'cum',dvhPoints);
-        caSampRes(i).qi  = matRad_calcQualityIndicators(cst,pln,resultSamp.(pln.bioParam.quantityVis),refGy,refVol);
+        caSampRes(i).dvh = matRad_calcDVH(cst,resultSamp.(quantityVis),'cum',dvhPoints);
+        caSampRes(i).qi  = matRad_calcQualityIndicators(cst,pln,resultSamp.(quantityVis),refGy,refVol);
 
         % Show progress
         if matRad_cfg.logLevel > 2

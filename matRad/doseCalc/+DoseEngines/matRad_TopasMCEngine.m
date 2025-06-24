@@ -28,6 +28,8 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
     end
 
     properties
+        hlut;
+        useGivenEqDensityCube;      % Use the given density cube ct.cube and omit conversion from cubeHU.
         calcLET = false;
         calcBioDose = false;
         prescribedDose = [];
@@ -185,7 +187,9 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
         function setDefaults(this)
             this.setDefaults@DoseEngines.matRad_MonteCarloEngineAbstract();
             matRad_cfg = MatRad_Config.instance(); %Instance of matRad configuration class
-
+            
+            this.useGivenEqDensityCube        = matRad_cfg.defaults.propDoseCalc.useGivenEqDensityCube;
+            
             % Default execution paths are set here
             this.topasFolder = [matRad_cfg.matRadSrcRoot filesep 'doseCalc' filesep 'topas' filesep];
             this.workingDir = [matRad_cfg.primaryUserFolder filesep 'TOPAS' filesep];
@@ -481,7 +485,7 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
                 end
             end            
 
-            % Get photon parameters for RBExD calculation
+            % Get photon parameters for RBExDose calculation
             if this.calcBioDose
                 this.scorer.RBE = true;
                 if exist('VdoseGrid', 'var')
@@ -495,6 +499,10 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
             % save current directory to revert back to later
             currDir = cd;
 
+            if this.multScen.totNumRangeScen > 1
+                matRad_cfg.dispWarning('Range shift scenarios are not yet implemented for Monte Carlo simulations.');
+            end
+
             for shiftScen = 1:this.multScen.totNumShiftScen
 
                 %Find first instance of the shift to select the shift values
@@ -502,7 +510,7 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
 
                 % manipulate isocenter
                 for k = 1:numel(stf)
-                    stf(k).isoCenter = stf(k).isoCenter + this.multScen.isoShift(ixShiftScen,:);
+                    stf(k).isoCenter = matRad_world2cubeCoords(stf(k).isoCenter,this.doseGrid) + this.multScen.isoShift(ixShiftScen,:);
                 end
 
                 % Delete previous topas files so there is no mix-up
@@ -541,7 +549,7 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
                 % later are stored in the MCparam file that is stored in the folder. The folder is generated in the working
                 % directory and the matRad_plan*.txt file can be manually called with TOPAS.
                 if strcmp(this.externalCalculation,'write')
-                    matRad_cfg.dispInfo(['TOPAS simulation skipped for external calculation\nFiles have been written to: "',replace(this.workingDir,'\','\\'),'"']);
+                    matRad_cfg.dispInfo(['TOPAS simulation skipped for external calculation\nFiles have been written to: "',strrep(this.workingDir,'\','\\'),'"']);
                 else
                     for ctScen = 1:ct.numOfCtScen
                         for beamIx = 1:numel(stf)
@@ -552,7 +560,7 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
                                     fname = sprintf('%s_field%d_run%d',this.label,beamIx,runIx);
                                 end
 
-                                if isprop(this,'verbosity') && strcmp(this.verbosity,'full')
+                                if strcmp(this.verbosity,'full')
                                     topasCall = sprintf('%s %s.txt',this.topasExecCommand,fname);
                                 else
                                     topasCall = sprintf('%s %s.txt > %s.out > %s.log',this.topasExecCommand,fname,fname,fname);
@@ -569,7 +577,8 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
                                 [status,cmdout] = system(topasCall,'-echo');
 
                                 % Process TOPAS output and potential errors
-                                cout = splitlines(string(cmdout));
+                                % cout = splitlines(string(cmdout));
+                                cout = cmdout;
                                 if status == 0
                                     matRad_cfg.dispInfo('TOPAS simulation completed succesfully\n');
                                 else
@@ -648,6 +657,25 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
         function dij = initDoseCalc(this,ct,cst,stf)
             dij = this.initDoseCalc@DoseEngines.matRad_MonteCarloEngineAbstract(ct,cst,stf);
             matRad_cfg = MatRad_Config.instance();
+
+           % calculate rED or rSP from HU or take provided wedCube
+            if this.useGivenEqDensityCube && ~isfield(ct,'cube')
+                matRad_cfg.dispWarning('HU Conversion requested to be omitted but no ct.cube exists! Will override and do the conversion anyway!');
+                this.useGivenEqDensityCube = false;
+            end
+
+            if this.useGivenEqDensityCube
+                matRad_cfg.dispInfo('Omitting HU to rED/rSP conversion and using existing ct.cube!\n');
+            else
+                ct = matRad_calcWaterEqD(ct, stf); % Maybe we can avoid duplicating the CT here?
+            end
+
+            if isfield(ct,'hlut')
+                this.hlut = ct.hlut;
+            else
+                this.hlut = matRad_loadHLUT(ct,stf);
+            end
+
 
             % % for TOPAS we explicitly downsample the ct to the dose grid (might not be necessary in future versions with separated grids)
             % Check if CT has already been resampled
@@ -793,7 +821,7 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
             %}
 
             obj.MCparam.tallies = unique(obj.MCparam.tallies);
-            talliesCut = replace(obj.MCparam.tallies,'-','_');
+            talliesCut = strrep(obj.MCparam.tallies,'-','_');
 
             % Momentarily only consider IP weighted sum
             idx = 1;
@@ -1680,11 +1708,11 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
                         selectedData = [];
                         focusIndex = baseData.selectedFocus(baseData.energyIndex);
 
-                        scalarFields = ["NominalEnergy","EnergySpread","MeanEnergy"];                                                   
+                        scalarFields = {'NominalEnergy','EnergySpread','MeanEnergy'};                                                   
                         
                         for i = 1:numel(focusIndex)
                             for field = scalarFields
-                                baseData.monteCarloData(i).(field) = ones(1,max(focusIndex))*baseData.monteCarloData(i).(field);
+                                baseData.monteCarloData(i).(field{1}) = ones(1,max(focusIndex))*baseData.monteCarloData(i).(field{1});
                             end
                             selectedData = [selectedData, structfun(@(x) x(focusIndex(i)),baseData.monteCarloData(i),'UniformOutput',false)];
                         end
@@ -2247,7 +2275,7 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
                             fprintf(fileID,'s:Tf/ImageName/Function = "Step"\n');
                             % create time feature scorer and save with original rays and bixel names
                             imageName = ['sv:Tf/ImageName/Values = ',num2str(cutNumOfBixel),cell2mat(strcat(strcat(' "ray',strsplit(num2str([dataTOPAS.ray]))),strcat('_bixel',strsplit(num2str([dataTOPAS.bixel])),'"')))];
-                            fprintf(fileID,'%s\n',strjoin(imageName));
+                            fprintf(fileID,'%s\n',imageName);
                             fprintf(fileID,'dv:Tf/ImageName/Times = Tf/Beam/Spot/Times ms\n');
                         end
                     end
@@ -2329,7 +2357,7 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
             % Write material converter
             switch obj.materialConverter.mode
                 case 'RSP' % Relative stopping power converter
-                    rspHlut = matRad_loadHLUT(ct,obj.radiationMode);
+                    rspHlut = obj.hlut;
                     min_HU = rspHlut(1,1);
                     max_HU = rspHlut(end,1);
 
@@ -2353,8 +2381,8 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
                         fprintf(fID,'d:Ma/%s/Density = %f g/cm3\n',unique_materials{ix},unique_rsp(ix));
                     end
 
-                    %fprintf(fID,'s:Ge/Patient/Parent="World"\n');
                     fprintf(fID,'s:Ge/Patient/Parent="Isocenter"\n');
+                    %fprintf(fID,'s:Ge/Patient/Parent="World"\n');
                     fprintf(fID,'s:Ge/Patient/Type = "TsImageCube"\n');
                     fprintf(fID,'s:Ge/Patient/InputDirectory = "./"\n');
                     fprintf(fID,'s:Ge/Patient/InputFile = "%s"\n',dataFile);
@@ -2382,7 +2410,7 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
 
 
                 case 'HUToWaterSchneider' % Schneider converter
-                    rspHlut = matRad_loadHLUT(ct,obj.radiationMode);
+                    rspHlut = obj.hlut;
 
                     try
                         % Write Schneider Converter
@@ -2516,8 +2544,9 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
                         % write patient environment
                         matRad_cfg.dispInfo('TOPAS: Writing patient environment\n');
                         fprintf(fID,'\n# -- Patient parameters\n');
-                        %fprintf(fID,'s:Ge/Patient/Parent="World"\n');
+
                         fprintf(fID,'s:Ge/Patient/Parent="Isocenter"\n');
+                        %fprintf(fID,'s:Ge/Patient/Parent="World"\n');
                         fprintf(fID,'s:Ge/Patient/Type = "TsImageCube"\n');
                         fprintf(fID,'b:Ge/Patient/DumpImagingValues = "True"\n');
                         fprintf(fID,'s:Ge/Patient/InputDirectory = "./"\n');
@@ -2580,9 +2609,9 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
 
     end
     methods(Static)
-           function [available,msg] = isAvailable(pln,machine)   
+        function [available,msg] = isAvailable(pln,machine)
             % see superclass for information
-            
+
             msg = [];
             available = false;
 
@@ -2596,7 +2625,7 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
 
                 %check modality
                 checkModality = any(strcmp(DoseEngines.matRad_TopasMCEngine.possibleRadiationModes, machine.meta.radiationMode));
-                
+
                 preCheck = checkBasic && checkModality;
 
                 if ~preCheck
@@ -2608,9 +2637,12 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
                 msg = 'Your machine file is invalid and does not contain the basic field (meta/data/radiationMode)!';
                 return;
             end
-
-            
-       end
+        end
+        %Used to check against a machine file if a specific quantity can be
+        %computed.
+        function q = providedQuantities(machine)
+            q = {'physicalDose','LET','alpha','beta'};            
+        end
     end
 end
 

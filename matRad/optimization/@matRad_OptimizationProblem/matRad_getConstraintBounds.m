@@ -20,7 +20,7 @@ function [cl,cu] = matRad_getConstraintBounds(optiProb,cst)
 % 
 % This file is part of the matRad project. It is subject to the license 
 % terms in the LICENSE file found in the top-level directory of this 
-% distribution and at https://github.com/e0404/matRad/LICENSES.txt. No part 
+% distribution and at https://github.com/e0404/matRad/LICENSE.md. No part 
 % of the matRad project, including this file, may be copied, modified, 
 % propagated, or distributed except according to the terms contained in the 
 % LICENSE file.
@@ -39,7 +39,7 @@ cu = [];
 for  i = 1:size(cst,1)
 
     % Only take OAR or target VOI.
-    if ~any(cellfun(@isempty,cst{i,4})) && ( isequal(cst{i,3},'OAR') || isequal(cst{i,3},'TARGET') )
+    if ~any(cellfun(@isempty,cst{i,4})) && any(strcmp(cst{i,3},{'OAR','TARGET','EXTERNAL'}))
 
         % loop over the number of constraints for the current VOI
         for j = 1:numel(cst{i,6})

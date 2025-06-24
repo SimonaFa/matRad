@@ -20,7 +20,7 @@ function cst = matRad_computeVoiContours(ct,cst)
 %
 % This file is part of the matRad project. It is subject to the license
 % terms in the LICENSE file found in the top-level directory of this
-% distribution and at https://github.com/e0404/matRad/LICENSES.txt. No part
+% distribution and at https://github.com/e0404/matRad/LICENSE.md. No part
 % of the matRad project, including this file, may be copied, modified,
 % propagated, or distributed except according to the terms contained in the
 % LICENSE file.
@@ -51,6 +51,8 @@ for ctScen = 1:ct.numOfCtScen
                 cst{s,7}{1,ctScen}{slice,3} = contourc(squeeze(mask(:,:,slice)),.5*[1 1]);
             end
         end
-        matRad_progress(s + (ctScen-1)*s,size(cst,1)*ct.numOfCtScen);
+        if matRad_cfg.logLevel > 2
+            matRad_progress(s + (ctScen-1)*s,size(cst,1)*ct.numOfCtScen);
+        end
     end
 end

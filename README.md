@@ -1,10 +1,12 @@
 [![Current Release](https://img.shields.io/github/v/release/e0404/matRad)](https://github.com/e0404/matRad/releases) 
 [![Downloads](https://img.shields.io/github/downloads/e0404/matRad/total)](https://github.com/e0404/matRad/releases) 
 [![Contributors](https://img.shields.io/github/contributors/e0404/matRad)](https://github.com/e0404/matRad/graphs/contributors)
+![Citations](https://img.shields.io/endpoint?url=https%3A%2F%2Fapi.juleskreuer.eu%2Fcitation-badge.php%3Fshield%26doi%3D10.1002%2Fmp.12251&style=flat&color=blue)
 
 [![GitHub Build Status](https://github.com/e0404/matRad/actions/workflows/tests.yml/badge.svg)](https://github.com/e0404/matRad/actions/workflows/tests.yml)
+[![codecov](https://codecov.io/gh/e0404/matRad/graph/badge.svg?token=xQhUQLu4FK)](https://codecov.io/gh/e0404/matRad)
 
-DOIs:
+Citable DOIs:
 - General DOI: [![DOI](https://zenodo.org/badge/doi/10.5281/zenodo.3879615.svg)](https://doi.org/10.5281/zenodo.3879615)
 - Latest Release: [![DOI](https://zenodo.org/badge/29671667.svg)](https://zenodo.org/badge/latestdoi/29671667)
 
@@ -142,6 +144,6 @@ matRad is distributed in the hope that it will be useful, but WITHOUT ANY WARRAN
 
 Please note that we treat the compilation of matRad and Ipopt as separate and independent works (or modules, components, programs). Therefore, to the best of our understanding, the compilation of matRad and Ipopt is subject to the "Mere Aggregation" exception in section 5 of the GNU v3 and the exemption from "Contributions" in section 1. b) ii) of the EPL v1.0. Should this interpretation turn out to be not in compliance with the applicable laws in force, we have provided you with an additional permission under GNU GPL version 3 section 7 to allow you to use the work resulting from combining matRad with Ipopt.
 
-You will receive a copy of the GPL v3  and a copy of the EPL v1.0 in the file LICENSES.txt along with the compilation. If not, see http://www.gnu.org/licenses/ and/or http://opensource.org/licenses/EPL-1.0/.
+You will receive a copy of the GPL v3  and a copy of the EPL v1.0 in the file LICENSE.md along with the compilation. If not, see http://www.gnu.org/licenses/ and/or http://opensource.org/licenses/EPL-1.0/.
 
 ---

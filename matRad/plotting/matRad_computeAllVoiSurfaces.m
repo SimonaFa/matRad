@@ -20,7 +20,7 @@ function cst = matRad_computeAllVoiSurfaces(ct,cst)
 % 
 % This file is part of the matRad project. It is subject to the license 
 % terms in the LICENSE file found in the top-level directory of this 
-% distribution and at https://github.com/e0404/matRad/LICENSES.txt. No part 
+% distribution and at https://github.com/e0404/matRad/LICENSE.md. No part 
 % of the matRad project, including this file, may be copied, modified, 
 % propagated, or distributed except according to the terms contained in the 
 % LICENSE file.
@@ -33,7 +33,8 @@ matRad_cfg.dispInfo('Computing 3D Surfaces...\n');
 % initialize waitbar
 % TODO: This should be managed from the user interface instead
 if ~matRad_cfg.disableGUI
-    figureWait = waitbar(0,'Computing 3D Surfaces...');
+    figureWait = waitbar(0,'Computing 3D Surfaces...','Color',matRad_cfg.gui.backgroundColor,'DefaultTextColor',matRad_cfg.gui.textColor);
+    matRad_applyThemeToWaitbar(figureWait);
     % prevent closure of waitbar and show busy state
     set(figureWait,'pointer','watch');
 end
@@ -54,7 +55,16 @@ for s = 1:numVois
     
     %Smooth the VOI
     v = smooth3(mask,'gaussian',[5 5 5],2);
-    isoSurface = isosurface(xMesh,yMesh,zMesh,v,0.5);
+
+    maskThreshold = 0.5;
+
+    %Small sanity check in case we smoothed to much on a small VOI
+    if all(v(:) < maskThreshold)
+        v = mask;
+    end
+    
+    isoSurface = isosurface(xMesh,yMesh,zMesh,v,maskThreshold);
+    
     
     %reduce the complexity
     isoSurface = reducepatch(isoSurface,0.05);
@@ -70,14 +80,16 @@ for s = 1:numVois
         matRad_progress(s,numVois);
     end
 
-    if any(ishandle(figureWait))
+    if ~matRad_cfg.disableGUI && any(ishandle(figureWait))
         waitbar(s/numVois,figureWait); % Update the waitbar
     end    
 end    
 
 try
-    delete(figureWait);
-    pause(0.1); 
+    if ~matRad_cfg.disableGUI
+        delete(figureWait);
+        pause(0.1); 
+    end
 catch
     %Nothing to do
 end

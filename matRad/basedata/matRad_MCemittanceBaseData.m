@@ -15,7 +15,7 @@ classdef matRad_MCemittanceBaseData
     %
     % This file is part of the matRad project. It is subject to the license
     % terms in the LICENSE file found in the top-level directory of this
-    % distribution and at https://github.com/e0404/matRad/LICENSES.txt. No part
+    % distribution and at https://github.com/e0404/matRad/LICENSE.md. No part
     % of the matRad project, including this file, may be copied, modified,
     % propagated, or distributed except according to the terms contained in the
     % LICENSE file.
@@ -479,7 +479,14 @@ classdef matRad_MCemittanceBaseData
                 
                 options.ipopt.hessian_approximation = 'limited-memory';
                 options.ipopt.limited_memory_update_type = 'bfgs';
-                options.ipopt.print_level = 1;
+                
+                %Set Default Options
+                if obj.matRad_cfg.logLevel <= 1
+                    lvl = 0;
+                else
+                    lvl = 1;
+                end
+                options.ipopt.print_level = lvl;
                 
                 start = [0.9; 0.1];
                 [result, ~] = ipopt (start, funcs, options);
@@ -534,6 +541,21 @@ classdef matRad_MCemittanceBaseData
             mcDataOptics.Divergence2y  = 0;
             mcDataOptics.Correlation2y = 0;
             mcDataOptics.FWHMatIso = 2.355 * sigmaSqIso;
+
+            % Parameters for parametrization of sigma squared model.
+            % sigma^2 = a + b*z + c*z^2;
+            mcDataOptics.sSQ_a = (sigmaSqIso/10)^2;
+            mcDataOptics.sSQ_b = (2*rho*sigmaT*sigmaSqIso)/10;
+            mcDataOptics.sSQ_c = sigmaT^2;
+
+            % Parameters for emittance model
+            mcDataOptics.twissEpsilonX =  sqrt(mcDataOptics.sSQ_a*mcDataOptics.sSQ_c - (mcDataOptics.sSQ_b^2)/4);
+            mcDataOptics.twissAlphaX   = - mcDataOptics.sSQ_b/(2*mcDataOptics.twissEpsilonX);
+            mcDataOptics.twissBetaX    =  mcDataOptics.sSQ_a/mcDataOptics.twissEpsilonX;
+
+            mcDataOptics.twissEpsilonY = mcDataOptics.twissEpsilonX;
+            mcDataOptics.twissAlphaY   = mcDataOptics.twissAlphaX;
+            mcDataOptics.twissBetaY    = mcDataOptics.twissBetaX;
         end
         
         

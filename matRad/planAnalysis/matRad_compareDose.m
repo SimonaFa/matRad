@@ -18,7 +18,7 @@ function [gammaCube,gammaPassRate,hfig] = matRad_compareDose(cube1, cube2, ct, c
 %                  [0 0 1]: evaluate only DVH
 %   contours       (optional) specify if contours are plotted,
 %                  'on' or 'off'
-%   pln            (optional) specify BioModel for DVH plot
+%   pln            (optional) specify BfioModel for DVH plot
 %   criteria:      (optional)[1x2] vector specifying the distance to agreement
 %                  criterion; first element is percentage difference,
 %                  second element is distance [mm], default [3 3]
@@ -48,7 +48,7 @@ function [gammaCube,gammaPassRate,hfig] = matRad_compareDose(cube1, cube2, ct, c
 %
 % This file is part of the matRad project. It is subject to the license
 % terms in the LICENSE file found in the top-level directory of this
-% distribution and at https://github.com/e0404/matRad/LICENSES.txt. No part
+% distribution and at https://github.com/e0404/matRad/LICENSE.md. No part
 % of the matRad project, including this file, may be copied, modified,
 % propagated, or distributed except according to the terms contained in the
 % LICENSE file.
@@ -56,6 +56,12 @@ function [gammaCube,gammaPassRate,hfig] = matRad_compareDose(cube1, cube2, ct, c
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 matRad_cfg = MatRad_Config.instance();
+
+colorSpec = {'Color',matRad_cfg.gui.elementColor,...
+        'XColor',matRad_cfg.gui.textColor,...
+        'YColor',matRad_cfg.gui.textColor,...
+        'GridColor',matRad_cfg.gui.textColor,...
+        'MinorGridColor',matRad_cfg.gui.backgroundColor};
 
 %% check if cubes consistent
 if ~isequal(size(cube1),size(cube2))
@@ -104,25 +110,24 @@ diffCMap = matRad_getColormap('diffMap');
 
 %% Calculate iso-center slices and resolution
 if isempty(cst)
-    [~,s(1)] = max(sum(sum(cube1,1),3));
-    [~,s(2)] = max(sum(sum(cube1,2),3));
-    [~,s(3)] = max(sum(sum(cube1,1),2));
-    isoCenter = [ct.resolution.y*s(1) ct.resolution.x*s(2) ct.resolution.z*s(3)];
-else
-    isoCenter = matRad_getIsoCenter(cst,ct,0);
+    isoCenterIx = round(ct.cubeDim./2);
+else    
+    isoCenterIx = matRad_world2cubeIndex( matRad_getIsoCenter(cst,ct,0),ct);
 end
 
 resolution = [ct.resolution.x ct.resolution.y ct.resolution.z];
 
-slicename = {round(isoCenter(2)./resolution(2)),round(isoCenter(1)./resolution(1)),round(isoCenter(3)./resolution(3))};
-doseWindow = [0 max([cube1(:); cube2(:)])];
-planename = {'coronal','sagittal','axial'};
+sliceName = {isoCenterIx(1),isoCenterIx(2),isoCenterIx(3)};
+doseWindow = [0 max([cube1(:); cube2(:)])*1.001];
+planeName = {'coronal','sagittal','axial'};
 
 %% Integral Energy Output
-intEnergy1 = matRad_calcIntEnergy(cube1,ct,pln);
-intEnergy2 = matRad_calcIntEnergy(cube2,ct,pln);
-
-matRad_cfg.dispInfo('Integral energy comparison: Cube 1 = %1.4g MeV, Cube 2 = %1.4g MeV, difference = %1.4g Mev\n',intEnergy1,intEnergy2,intEnergy1-intEnergy2);
+if ~isempty(pln)    
+    intEnergy1 = matRad_calcIntEnergy(cube1,ct,pln);
+    intEnergy2 = matRad_calcIntEnergy(cube2,ct,pln);
+    
+    matRad_cfg.dispInfo('Integral energy comparison: Cube 1 = %1.4g MeV, Cube 2 = %1.4g MeV, difference = %1.4g Mev\n',intEnergy1,intEnergy2,intEnergy1-intEnergy2);
+end
 
 %% Colorwash images
 if enable(1) == 1
@@ -159,67 +164,69 @@ if enable(1) == 1
     end
     
     for plane = 1:3
-        matRad_cfg.dispInfo('Plotting %s plane...\n',planename{plane});
+        matRad_cfg.dispInfo('Plotting %s plane...\n',planeName{plane});
         
         % Initialize Figure
-        hfig.(planename{plane}).('fig') = figure('Renderer', 'painters', 'Position', [10 50 800 800]);
-        set(gcf,'Color',[1 1 1]);
+        hfig.(planeName{plane}).('fig') = figure('Position', [10 50 800 800],'Color',matRad_cfg.gui.backgroundColor);
         
         % Plot Dose 1
-        hfig.(planename{plane}).('cube1').Axes = subplot(2,2,1);
-        [hfig.(planename{plane}).('cube1').CMap,...
-            hfig.(planename{plane}).('cube1').Dose,...
-            hfig.(planename{plane}).('cube1').Ct,...
-            hfig.(planename{plane}).('cube1').Contour,...
-            hfig.(planename{plane}).('cube1').IsoDose] = ...
-            matRad_plotSliceWrapper(gca,ct,cstHandle,1,cube1,plane,slicename{plane},[],[],colorcube,jet,doseWindow,[],100);
-        
+        hfig.(planeName{plane}).('cube1').Axes = subplot(2,2,1,colorSpec{:});
+        [hfig.(planeName{plane}).('cube1').CMap,...
+            hfig.(planeName{plane}).('cube1').Dose,...
+            hfig.(planeName{plane}).('cube1').Ct,...
+            hfig.(planeName{plane}).('cube1').Contour,...
+            hfig.(planeName{plane}).('cube1').IsoDose] = ...
+            matRad_plotSlice(ct, 'axesHandle', gca, 'cst', cstHandle, 'cubeIdx', 1, 'dose', cube1, 'plane', plane, 'slice', sliceName{plane}, 'contourColorMap', colorcube, 'doseColorMap', jet, 'doseWindow', doseWindow, 'voiSelection', 100);
+            %matRad_plotSliceWrapper(gca,ct,cstHandle,1,cube1,plane,sliceName{plane},[],[],colorcube,jet,doseWindow,[],100);
+            
         % Plot Dose 2
-        hfig.(planename{plane}).('cube2').Axes = subplot(2,2,2);
-        [hfig.(planename{plane}).('cube2').CMap,...
-            hfig.(planename{plane}).('cube2').Dose,...
-            hfig.(planename{plane}).('cube2').Ct,...
-            hfig.(planename{plane}).('cube2').Contour,...
-            hfig.(planename{plane}).('cube2').IsoDose] = ...
-            matRad_plotSliceWrapper(gca,ct,cstHandle,1,cube2,plane,slicename{plane},[],[],colorcube,jet,doseWindow,[],100);
+        hfig.(planeName{plane}).('cube2').Axes = subplot(2,2,2,colorSpec{:});
+        [hfig.(planeName{plane}).('cube2').CMap,...
+            hfig.(planeName{plane}).('cube2').Dose,...
+            hfig.(planeName{plane}).('cube2').Ct,...
+            hfig.(planeName{plane}).('cube2').Contour,...
+            hfig.(planeName{plane}).('cube2').IsoDose] = ...
+            matRad_plotSlice(ct, 'axesHandle', gca, 'cst', cstHandle, 'cubeIdx', 1, 'dose', cube2, 'plane', plane, 'slice', sliceName{plane}, 'contourColorMap', colorcube, 'doseColorMap', jet, 'doseWindow', doseWindow, 'voiSelection', 100);
+        %matRad_plotSliceWrapper(gca,ct,cstHandle,1,cube2,plane,sliceName{plane},[],[],colorcube,jet,doseWindow,[],100);
         
         % Plot absolute difference
-        hfig.(planename{plane}).('diff').Axes = subplot(2,2,3);
-        [hfig.(planename{plane}).('diff').CMap,...
-            hfig.(planename{plane}).('diff').Dose,...
-            hfig.(planename{plane}).('diff').Ct,...
-            hfig.(planename{plane}).('diff').Contour,...
-            hfig.(planename{plane}).('diff').IsoDose] = ...
-            matRad_plotSliceWrapper(gca,ct,cstHandle,1,differenceCube,plane,slicename{plane},[],[],colorcube,diffCMap,doseDiffWindow,[],100);
+        hfig.(planeName{plane}).('diff').Axes = subplot(2,2,3,colorSpec{:});
+        [hfig.(planeName{plane}).('diff').CMap,...
+            hfig.(planeName{plane}).('diff').Dose,...
+            hfig.(planeName{plane}).('diff').Ct,...
+            hfig.(planeName{plane}).('diff').Contour,...
+            hfig.(planeName{plane}).('diff').IsoDose] = ...
+            matRad_plotSlice(ct, 'axesHandle', gca, 'cst', cstHandle, 'cubeIdx', 1, 'dose', differenceCube, 'plane', plane, 'slice', sliceName{plane}, 'contourColorMap', colorcube, 'doseColorMap', diffCMap, 'doseWindow', doseDiffWindow, 'voiSelection', 100);
+            %matRad_plotSliceWrapper(gca,ct,cstHandle,1,differenceCube,plane,sliceName{plane},[],[],colorcube,diffCMap,doseDiffWindow,[],100);
         
         % Plot gamma analysis
-        hfig.(planename{plane}).('gamma').Axes = subplot(2,2,4);
+        hfig.(planeName{plane}).('gamma').Axes = subplot(2,2,4,colorSpec{:});
         gammaCMap = matRad_getColormap('gammaIndex');
-        [hfig.(planename{plane}).('gamma').CMap,...
-            hfig.(planename{plane}).('gamma').Dose,...
-            hfig.(planename{plane}).('gamma').Ct,...
-            hfig.(planename{plane}).('gamma').Contour,...
-            hfig.(planename{plane}).('gamma').IsoDose]=...
-            matRad_plotSliceWrapper(gca,ct,cstHandle,1,gammaCube,plane,slicename{plane},[],[],colorcube,gammaCMap,doseGammaWindow,[],100);
+        [hfig.(planeName{plane}).('gamma').CMap,...
+            hfig.(planeName{plane}).('gamma').Dose,...
+            hfig.(planeName{plane}).('gamma').Ct,...
+            hfig.(planeName{plane}).('gamma').Contour,...
+            hfig.(planeName{plane}).('gamma').IsoDose]=...
+            matRad_plotSlice(ct, 'axesHandle', gca, 'cst', cstHandle, 'cubeIdx', 1, 'dose', gammaCube, 'plane', plane, 'slice', sliceName{plane}, 'contourColorMap', colorcube, 'doseColorMap', gammaCMap, 'doseWindow', doseGammaWindow, 'voiSelection', 100);
+            %matRad_plotSliceWrapper(gca,ct,cstHandle,1,gammaCube,plane,sliceName{plane},[],[],colorcube,gammaCMap,doseGammaWindow,[],100);
         
         % Adjusting axes
-        matRad_plotAxisLabels(hfig.(planename{plane}).('cube1').Axes,ct,plane,slicename{plane},[],100);
+        matRad_plotAxisLabels(hfig.(planeName{plane}).('cube1').Axes,ct,plane,sliceName{plane},[],100);
         if strcmp(pln.displayQuantity, 'clusterDose')
-            set(get(hfig.(planename{plane}).('cube1').Axes, 'title'), 'string', ['clusterDose ' pln.propDoseCalc.clusterDoseIP num2str(pln.propDoseCalc.clusterDoseK) ' matRad']);
+            set(get(hfig.(planeName{plane}).('cube1').Axes, 'title'), 'string', ['clusterDose ' pln.propDoseCalc.clusterDoseIP num2str(pln.propDoseCalc.clusterDoseK) ' matRad']);
         else
-            set(get(hfig.(planename{plane}).('cube1').Axes, 'title'), 'string', 'Dose 1');
+            set(get(hfig.(planeName{plane}).('cube1').Axes, 'title'), 'string', 'Dose 1');
         end
-        matRad_plotAxisLabels(hfig.(planename{plane}).('cube2').Axes,ct,plane,slicename{plane},[],100);
+        matRad_plotAxisLabels(hfig.(planeName{plane}).('cube2').Axes,ct,plane,sliceName{plane},[],100);
         if strcmp(pln.displayQuantity, 'clusterDose')
-            set(get(hfig.(planename{plane}).('cube2').Axes, 'title'), 'string', ['clusterDose ' pln.propDoseCalc.clusterDoseIP num2str(pln.propDoseCalc.clusterDoseK) ' TOPAS']);
+            set(get(hfig.(planeName{plane}).('cube2').Axes, 'title'), 'string', ['clusterDose ' pln.propDoseCalc.clusterDoseIP num2str(pln.propDoseCalc.clusterDoseK) ' TOPAS']);
         else
-            set(get(hfig.(planename{plane}).('cube2').Axes, 'title'), 'string', 'Dose 2');
+            set(get(hfig.(planeName{plane}).('cube2').Axes, 'title'), 'string', 'Dose 2');
         end
-        matRad_plotAxisLabels(hfig.(planename{plane}).('diff').Axes,ct,plane,slicename{plane},[],100);
-        set(get(hfig.(planename{plane}).('diff').Axes, 'title'), 'string', 'Absolute difference');
-        matRad_plotAxisLabels(hfig.(planename{plane}).('gamma').Axes,ct,plane,slicename{plane},[],100);
-        set(get(hfig.(planename{plane}).('gamma').Axes, 'title'), 'string', {[num2str(gammaPassRate{1,2},5) '% of points > ' num2str(relDoseThreshold) '% pass gamma criterion (' num2str(relDoseThreshold) '% / ' num2str(dist2AgreeMm) 'mm)']; ['with ' num2str(2^n-1) ' interpolation points']});
-        
+        matRad_plotAxisLabels(hfig.(planeName{plane}).('diff').Axes,ct,plane,sliceName{plane},[],100);
+        set(get(hfig.(planeName{plane}).('diff').Axes, 'title'), 'string', 'Absolute difference');
+        matRad_plotAxisLabels(hfig.(planeName{plane}).('gamma').Axes,ct,plane,sliceName{plane},[],100);
+        set(get(hfig.(planeName{plane}).('gamma').Axes, 'title'), 'string', {[num2str(gammaPassRate{1,2},5) '% of points > ' num2str(relDoseThreshold) '% pass gamma criterion (' num2str(relDoseThreshold) '% / ' num2str(dist2AgreeMm) 'mm)']; ['with ' num2str(2^n-1) ' interpolation points']});       
     end
 end
 
@@ -228,37 +235,38 @@ centerAtIsocenter = false;
 if enable(2) == 1
     matRad_cfg.dispInfo('Plotting profiles...\n');
     fontsize = 12;
-    profilex{1} = squeeze(cube1(slicename{1},:,slicename{3}));
-    profiley{1} = squeeze(cube1(:,slicename{2},slicename{3}));
-    profilez{1} = squeeze(cube1(slicename{1},slicename{2},:));
+    profilex{1} = squeeze(cube1(sliceName{1},:,sliceName{3}));
+    profiley{1} = squeeze(cube1(:,sliceName{2},sliceName{3}));
+    profilez{1} = squeeze(cube1(sliceName{1},sliceName{2},:));
 
-    profilex{2} = squeeze(cube2(slicename{1},:,slicename{3}));
-    profiley{2} = squeeze(cube2(:,slicename{2},slicename{3}));
-    profilez{2} = squeeze(cube2(slicename{1},slicename{2},:));
+    profilex{2} = squeeze(cube2(sliceName{1},:,sliceName{3}));
+    profiley{2} = squeeze(cube2(:,sliceName{2},sliceName{3}));
+    profilez{2} = squeeze(cube2(sliceName{1},sliceName{2},:));
     
     posX = resolution(1)*(1:length(profilex{1}));
     posY = resolution(2)*(1:length(profiley{1}));
     posZ = resolution(3)*(1:length(profilez{1}));
     if centerAtIsocenter
-        posX = posX - isoCenter(1);
-        posY = posY - isoCenter(2);
-        posZ = posZ - isoCenter(3);
+        posX = posX - isoCenterIx(1);
+        posY = posY - isoCenterIx(2);
+        posZ = posZ - isoCenterIx(3);
     end
 
     if exist('pln','var') && ~isempty(pln)
         if isfield(pln, 'displayQuantity') && (contains(pln.displayQuantity, 'clusterDose'))
             yLabelString = ['g(' pln.propDoseCalc.clusterDoseIP num2str(pln.propDoseCalc.clusterDoseK) ') [$kg^{-1}$]'];
-        elseif strcmp(pln.bioParam.quantityVis,'physicalDose')
-            yLabelString = 'Dose [Gy]';
+        elseif isfield(pln,'propOpt') && isfield(pln.propOpt,'quantityOpt')
+            if strcmp(pln.propOpt.quantityOpt,'physicalDose')
+                yLabelString = 'Dose [Gy]';
+            else
+                yLabelString = 'RBE x Dose [Gy(RBE)]';
+            end
         else
-            yLabelString = 'RBE x Dose [Gy(RBE)]';
+            yLabelString = 'Dose [Gy]';
         end
-    else
-        yLabelString = 'Dose [Gy]';
     end
     
-    hfig.profiles.fig = figure('Renderer', 'painters', 'Position', [10 50 800 800]);
-    set(gcf,'Color',[1 1 1]);
+    hfig.profiles.fig = figure('Position', [10 50 800 800],'Color',matRad_cfg.gui.backgroundColor);
     
     hfig.profiles.x = subplot(2,2,1);
     plot(posX,profilex{1},'r')
@@ -294,6 +302,18 @@ if enable(2) == 1
     legend boxoff
     
     set(hfig.profiles.fig,'name',['Profiles:, x=',num2str(slicename{1}),'mm, y=',num2str(slicename{2}),'mm, z=',num2str(slicename{3}),'mm']);
+%{
+    hfig.profiles.x = subplot(2,2,1,colorSpec{:});
+    profilePlot(hfig.profiles.x,posX,profilex{1},profilex{2},'x-Profiles','Dose 1','Dose 2', 'x [mm]','dose [Gy]',matRad_cfg.gui);
+
+    hfig.profiles.y = subplot(2,2,2,colorSpec{:});
+    profilePlot(hfig.profiles.y,posY,profiley{1},profiley{2},'y-Profiles','Dose 1','Dose 2', 'x [mm]','dose [Gy]',matRad_cfg.gui);
+
+    hfig.profiles.z = subplot(2,2,3,colorSpec{:});
+    profilePlot(hfig.profiles.z,posZ,profilez{1},profilez{2},'z-Profiles','Dose 1','Dose 2', 'x [mm]','dose [Gy]',matRad_cfg.gui);
+    
+    set(hfig.profiles.fig,'name',['Profiles:, x=',num2str(sliceName{1}),'mm, y=',num2str(sliceName{2}),'mm, z=',num2str(sliceName{3}),'mm']);
+%}
     
 end
 
@@ -306,15 +326,26 @@ if enable(3) == 1 && ~isempty(cst)
     % Plot DVH
     matRad_cfg.dispInfo('Plotting DVH...');
     
-    hfig.dvh.fig = figure('Renderer', 'painters', 'Position', [10 100 1000 700]);
-    set(gcf,'Color',matRad_cfg.gui.backgroundColor);
-    matRad_showDVH(axes(gcf),dvh1,cst,pln);
+    hfig.dvh.fig = figure('Position', [10 100 1000 700],'Color',matRad_cfg.gui.backgroundColor);
+    matRad_showDVH(dvh1,cst,pln,'axesHandle',axes(hfig.dvh.fig,colorSpec{:}));
     hold on
-    matRad_showDVH(gca,dvh2,cst,pln,2);
+    matRad_showDVH(dvh2,cst,pln,'axesHandle',gca,'LineStyle','--');
     xlim([0 dvhWindow*1.2])
-    title('Dose Volume Histrogram, Dose 1: solid, Dose 2: dashed')
+    title('Dose Volume Histrogram, Dose 1: solid, Dose 2: dashed','Color',matRad_cfg.gui.highlightColor)
 end
 %%
 matRad_cfg.dispInfo('Done!\n');
 
+end
+
+function profilePlot(hAx,x,y1,y2,titleTxt,nameProfile1,nameProfile2, xLabelTxt,yLabelTxt,guiSettings)
+    hold(hAx,'on');
+    grid(hAx,'on');
+    grid(hAx,'minor');
+    plot(hAx,x,y1,'r')
+    plot(hAx,x,y2,'r--')
+    xlabel(xLabelTxt,'FontSize',guiSettings.fontSize)
+    ylabel(yLabelTxt,'FontSize',guiSettings.fontSize);
+    title(titleTxt,'Color',guiSettings.highlightColor);
+    legend({nameProfile1,nameProfile2},'Location','best','TextColor',guiSettings.textColor,'Box','off');
 end

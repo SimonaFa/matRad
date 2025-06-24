@@ -1,10 +1,11 @@
-function [alphas,l,rho,d12,ix] = matRad_siddonRayTracer(isocenter, ...
+function [alphas,l,rho,d12,ix] = matRad_siddonRayTracer(isocenterCube, ...
                                     resolution, ...
                                     sourcePoint, ...
                                     targetPoint, ...
                                     cubes)
 % siddon ray tracing through 3D cube to calculate the radiological depth 
-% according to Siddon 1985 Medical Physics
+% according to Siddon 1985 Medical Physics. The raytracer expects the
+% isocenter in cube coordinates!
 % 
 % call
 %   [alphas,l,rho,d12,vis] = matRad_siddonRayTracer(isocenter, ...
@@ -14,7 +15,7 @@ function [alphas,l,rho,d12,ix] = matRad_siddonRayTracer(isocenter, ...
 %                               cubes)
 %
 % input
-%   isocenter:      isocenter within cube [voxels]
+%   isocenterCube:  isocenter in cube coordinates [mm]
 %   resolution:     resolution of the cubes [mm/voxel]
 %   sourcePoint:    source point of ray tracing
 %   targetPoint:    target point of ray tracing
@@ -39,7 +40,7 @@ function [alphas,l,rho,d12,ix] = matRad_siddonRayTracer(isocenter, ...
 % 
 % This file is part of the matRad project. It is subject to the license 
 % terms in the LICENSE file found in the top-level directory of this 
-% distribution and at https://github.com/e0404/matRad/LICENSES.txt. No part 
+% distribution and at https://github.com/e0404/matRad/LICENSE.md. No part 
 % of the matRad project, including this file, may be copied, modified, 
 % propagated, or distributed except according to the terms contained in the 
 % LICENSE file.
@@ -50,10 +51,8 @@ function [alphas,l,rho,d12,ix] = matRad_siddonRayTracer(isocenter, ...
 % works with negatives values. This put (resolution.x,resolution.y,resolution.z)
 % in the center of first voxel
 
-matRad_cfg = MatRad_Config.instance();
-
-sourcePoint = sourcePoint + isocenter;
-targetPoint = targetPoint + isocenter;
+sourcePoint = sourcePoint + isocenterCube;
+targetPoint = targetPoint + isocenterCube;
 
 % Save the numbers of planes.
 [yNumPlanes, xNumPlanes, zNumPlanes] = size(cubes{1});
@@ -85,10 +84,11 @@ tvalues = [tvalues,([xPlane_end,yPlane_end,zPlane_end] - sourcePoint)./ (targetP
 doesHit = false;
 for t = tvalues
     p = sourcePoint + t*(targetPoint - sourcePoint);
-    if (p(1) >= xPlane_1 && p(1) <= xPlane_end && ...
-        p(2) >= yPlane_1 && p(2) <= yPlane_end && ...
-        p(3) >= zPlane_1 && p(3) <= zPlane_end)
+    lowerPlanes = [xPlane_1,yPlane_1,zPlane_1]  - sqrt(eps);
+    upperPlanes = [xPlane_end,yPlane_end,zPlane_end]  + sqrt(eps);
+    if all(p > lowerPlanes & p < upperPlanes)
         doesHit = true;
+        continue;
     end
 end
 

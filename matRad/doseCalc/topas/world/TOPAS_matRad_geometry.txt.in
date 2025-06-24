@@ -32,7 +32,6 @@ s:Ge/Couch/Type = "Group"
 d:Ge/Couch/RotX = 0. deg
 #d:Ge/Couch/RotY = -1 * Sim/CouchAngle deg
 #d:Ge/Couch/RotZ = 0. deg
-
 d:Ge/Couch/RotY = 0. deg
 d:Ge/Couch/RotZ = Sim/CouchAngle deg
 
@@ -41,4 +40,3 @@ s:Ge/Gantry/Type = "Group"
 d:Ge/Gantry/RotX = Sim/GantryAngle deg
 d:Ge/Gantry/RotY =  0 deg
 d:Ge/Gantry/RotZ = -90. deg
-

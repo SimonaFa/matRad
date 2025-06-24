@@ -25,7 +25,7 @@ function matRad_writeVTK(filepath,cube,metadata)
 % 
 % This file is part of the matRad project. It is subject to the license 
 % terms in the LICENSE file found in the top-level directory of this 
-% distribution and at https://github.com/e0404/matRad/LICENSES.txt. No part 
+% distribution and at https://github.com/e0404/matRad/LICENSE.md. No part 
 % of the matRad project, including this file, may be copied, modified, 
 % propagated, or distributed except according to the terms contained in the 
 % LICENSE file.
@@ -44,11 +44,22 @@ if fid <= 0
 end
 cleaner = onCleanup(@() fclose(fid));
 
-%We perform 
-if isfield(metadata,'axisPermutation')
-    cube = permute(cube,metadata.axisPermutation);
+%We perform the permutation
+if ~isfield(metadata, 'axisPermutation')
+    % This reverts the matRlab conventianl indexing
+    axisPermutation = [2,1,3];
+else
+    if ~isequal(metadata.axisPermutation, [2,1,3])
+        matRad_cfg.dispWarning('Unconventianal permutation of patient indexing, this might cause inconsistency');
+    end
+    axisPermutation = metadata.axisPermutation;
 end
 
+% Force the permutation here according to the axis permutation
+cube = permute(cube, axisPermutation);
+
+% Need to permute the dimensions as well
+dimensions = size(cube);
 
 fprintf(fid, '# vtk DataFile Version 3.0\n');
 fprintf(fid, 'vtk output\n');

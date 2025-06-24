@@ -11,7 +11,7 @@ classdef matRad_MeanDose < DoseObjectives.matRad_DoseObjective
 % 
 % This file is part of the matRad project. It is subject to the license 
 % terms in the LICENSE file found in the top-level directory of this 
-% distribution and at https://github.com/e0404/matRad/LICENSES.txt. No part 
+% distribution and at https://github.com/e0404/matRad/LICENSE.md. No part 
 % of the matRad project, including this file, may be copied, modified, 
 % propagated, or distributed except according to the terms contained in the 
 % LICENSE file.
@@ -110,15 +110,15 @@ classdef matRad_MeanDose < DoseObjectives.matRad_DoseObjective
 
     methods (Access = protected)
         function fDose = objectiveQuadraticDiff(obj,dose)
-            fDose = (mean(dose(:)) - obj.parameters{1})^2;
+            fDose = (sum(dose(:))/numel(dose) - obj.parameters{1})^2;
         end
 
         function fDoseGrad = gradientQuadraticDiff(obj,dose)
-            fDoseGrad = 2*(mean(dose(:))-obj.parameters{1}) * ones(size(dose(:)))/numel(dose);
+            fDoseGrad = 2*(sum(dose(:))/numel(dose)-obj.parameters{1}) * ones(size(dose(:)))/numel(dose);
         end
 
         function fDose = objectiveLinearDiff(obj,dose)
-            fDose = abs(mean(dose(:)) - obj.parameters{1});
+            fDose = abs(sum(dose(:))/numel(dose) - obj.parameters{1});
         end
 
         function fDoseGrad = gradientLinearDiff(obj,dose)

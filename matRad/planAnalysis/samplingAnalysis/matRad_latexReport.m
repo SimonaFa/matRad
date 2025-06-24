@@ -37,7 +37,7 @@ function success = matRad_latexReport(outputPath, ct, cst, pln, nominalScenario,
 % 
 % This file is part of the matRad project. It is subject to the license 
 % terms in the LICENSE file found in the top-level directory of this 
-% distribution and at https://github.com/e0404/matRad/LICENSES.txt. No part 
+% distribution and at https://github.com/e0404/matRad/LICENSE.md. No part 
 % of the matRad project, including this file, may be copied, modified, 
 % propagated, or distributed except according to the terms contained in the 
 % LICENSE file.
@@ -67,7 +67,7 @@ mkdir(fullfile(dataPath,'figures'));
 
 %% correct cst for unwanted characters and disable commonly not wanted structures
 
-doseCube = nominalScenario.(pln.bioParam.quantityVis);
+doseCube = nominalScenario.(pln.bioModel.quantityVis);
 
 fillPrescription = isempty(dPres);
 
@@ -235,17 +235,18 @@ for plane=1:3
     for cubesToPlot = 1:3
         figure; ax = gca;
         
-        doseCube = nominalScenario.(pln.bioParam.quantityVis); 
+        doseCube = nominalScenario.(pln.bioModel.quantityVis); 
         
         if cubesToPlot == 1 
             
-            if isfield(nominalScenario,'RBExD')              
+            if isfield(nominalScenario,'RBExDose')              
               colorMapLabel = 'RBExDose [Gy(RBE)]';
             else
                 colorMapLabel = 'physical Dose [Gy]';
             end
             fileSuffix = 'nominal';
-            matRad_plotSliceWrapper(ax,ct,cst,1,doseCube,plane,slice,[],[],colors,[],[],[],[],colorMapLabel);
+            matRad_plotSlice(ct,'axesHandle', ax, 'cst', cst, 'cubeIdx', 1, 'dose', doseCube, 'plane', plane, 'slice', slice, 'contourColorMap', colors, 'colorBarLabel', colorMapLabel);
+            %matRad_plotSliceWrapper(ax,ct,cst,1,doseCube,plane,slice,[],[],colors,[],[],[],[],colorMapLabel);
             
         elseif cubesToPlot == 2
             
@@ -253,18 +254,20 @@ for plane=1:3
             colorMapLabel = 'gamma index';
             fileSuffix = 'gamma';
             gammaColormap = matRad_getColormap('gammaIndex');
-            matRad_plotSliceWrapper(ax,ct,cst,1,doseCube,plane,slice,[],[],colors,gammaColormap,[0 2],[],[],colorMapLabel);
+            matRad_plotSlice(ct,'axesHandle', ax, 'cst', cst, 'cubeIdx', 1, 'dose', doseCube, 'plane', plane, 'slice', slice, 'contourColorMap', colors, 'doseColorMap', gammaColormap, 'doseWindow', [0 2], 'colorBarLabel', colorMapLabel);
+            %matRad_plotSliceWrapper(ax,ct,cst,1,doseCube,plane,slice,[],[],colors,gammaColormap,[0 2],[],[],colorMapLabel);
             
         elseif cubesToPlot == 3
             
-            if isfield(nominalScenario,'RBExD')
+            if isfield(nominalScenario,'RBExDose')
                 colorMapLabel = 'Standard deviation [Gy(RBE)]';
             else
                 colorMapLabel = 'Standard deviation [Gy]';
             end
             doseCube = doseStat.stdCubeW;
             fileSuffix = 'stdW';
-            matRad_plotSliceWrapper(ax,ct,cst,1,doseCube,plane,slice,[],[],colors,[],[],[],[],colorMapLabel);
+            matRad_plotSlice(ct,'axesHandle', ax, 'cst', cst, 'cubeIdx', 1, 'dose', doseCube, 'plane', plane, 'slice', slice, 'contourColorMap', colors, 'colorBarLabel', colorMapLabel);
+            %matRad_plotSliceWrapper(ax,ct,cst,1,doseCube,plane,slice,[],[],colors,[],[],[],[],colorMapLabel);
             
         end
         drawnow();
@@ -280,7 +283,7 @@ if exist('matRad_getGaussianOrbitSamples','file') == 2
 
     slice = round(pln.propStf.isoCenter(1,plane) / ct.resolution.z,0);            
     framePath = fullfile(dataPath, 'frames');
-    if isfield(nominalScenario,'RBExD')
+    if isfield(nominalScenario,'RBExDose')
         legendColorbar = 'RBExDose [Gy(RBE)]';
     else
         legendColorbar = 'physical Dose [Gy]';
@@ -314,7 +317,7 @@ for i = 1:size(cst,1)
         x = nominalScenario.dvh(i).doseGrid(1:argmin);        
         h(1) = plot(x,y,'LineWidth',2, 'Color', colors(i,:), 'DisplayName', cst{i,2});      
         ylim([0 100]);
-        if strncmp(pln.bioParam.quantityVis,'RBExD',5)
+        if strncmp(pln.bioModel.quantityVis,'RBExDose',5)
             xlabel('Dose RBE x [Gy]');
         else
             xlabel('Dose [Gy]');
@@ -382,7 +385,7 @@ clear filename
 % relative file path (relative to main.tex)
 relativePath = fullfile('data','structures');
 
-if strcmp(pln.bioParam.quantityVis, 'RBExD')
+if strcmp(pln.bioModel.quantityVis, 'RBExDose')
     labelDoseDVH = 'Dose RBE x [Gy]';
 else
    labelDoseDVH = 'Dose [Gy]';

@@ -24,7 +24,7 @@ function matRad_calcStudy(multScen,varargin)
 %
 % This file is part of the matRad project. It is subject to the license
 % terms in the LICENSE file found in the top-level directory of this
-% distribution and at https://github.com/e0404/matRad/LICENSES.txt. No part
+% distribution and at https://github.com/e0404/matRad/LICENSE.md. No part
 % of the matRad project, including this file, may be copied, modified,
 % propagated, or distributed except according to the terms contained in the
 % LICENSE file.
@@ -82,15 +82,15 @@ if ~(exist('ct','var') && exist('cst','var') && exist('stf','var') && exist('pln
 end
 
 % calculate RBExDose
-if ~isfield(pln, 'bioParam')
+if ~isfield(pln, 'bioModel')
     if strcmp(pln.radiationMode, 'protons')
-        pln.bioOptimization = 'RBExD';
+        pln.bioOptimization = 'RBExDose';
         pln.model = 'constRBE';
     elseif strcmp(pln.radiationMode, 'carbon')
-        pln.bioOptimization = 'RBExD';
+        pln.bioOptimization = 'RBExDose';
         pln.model = 'LEM';
     end
-    pln.bioParam = matRad_bioModel(pln.radiationMode, pln.bioOptimization, pln.model);
+    pln.bioModel = matRad_bioModel(pln.radiationMode, pln.model);
 end
 
 

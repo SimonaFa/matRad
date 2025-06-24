@@ -27,7 +27,7 @@ function [optResult,optimizer] = matRad_directApertureOptimization(dij,cst,apert
 % 
 % This file is part of the matRad project. It is subject to the license 
 % terms in the LICENSE file found in the top-level directory of this 
-% distribution and at https://github.com/e0404/matRad/LICENSES.txt. No part 
+% distribution and at https://github.com/e0404/matRad/LICENSE.md. No part 
 % of the matRad project, including this file, may be copied, modified, 
 % propagated, or distributed except according to the terms contained in the 
 % LICENSE file.
@@ -67,14 +67,20 @@ cst = matRad_resizeCstToGrid(cst,dij.ctGrid.x,dij.ctGrid.y,dij.ctGrid.z,...
                                  dij.doseGrid.x,dij.doseGrid.y,dij.doseGrid.z);
 
 
+if ~isfield(pln,'bioModel')
+    pln.bioModel = 'none';
+end
+
+if ~isa(pln.bioModel,'matRad_BiologicalModel')
+    pln.bioModel = matRad_BiologicalModel.validate(pln.bioModel,pln.radiationMode);
+end
 
 % set optimization options
 options.ixForOpt     = 1;
 options.numOfScen    = 1;
 options.scenProb     = 1;
-options.bioOpt       = pln.bioParam.bioOpt;
-options.quantityOpt  = pln.bioParam.quantityOpt;
-options.model        = pln.bioParam.model;
+options.quantityOpt  = pln.propOpt.quantityOpt;
+options.model        = pln.bioModel.model;
 
 % update aperture info vector
 apertureInfo = matRad_OptimizationProblemDAO.matRad_daoVec2ApertureInfo(apertureInfo,apertureInfo.apertureVector);

@@ -43,7 +43,8 @@ matRad_cfg.dispInfo('%s\n',msg);
 % initialize waitbar
 % TODO: This should be managed from the user interface instead
 if ~matRad_cfg.disableGUI
-    this.hWaitbar = waitbar(0,msg);
+    this.hWaitbar = waitbar(0,msg,'Color',matRad_cfg.gui.backgroundColor,'DefaultTextColor',matRad_cfg.gui.textColor);
+    matRad_applyThemeToWaitbar(this.hWaitbar);
     % prevent closure of waitbar and show busy state
     set(this.hWaitbar,'pointer','watch');
 end
@@ -63,14 +64,23 @@ if ~isa(this.multScen,'matRad_ScenarioModel')
     this.multScen = matRad_multScen(ct,this.multScen);
 end
 
-if ~isa(this.bioParam,'matRad_BiologicalModel')
-    this.bioParam = matRad_bioModel(radiationMode,'physicalDose','none');
+% load machine file from base data folder
+this.machine = this.loadMachine(radiationMode,machine);
+
+%Biological Model
+if ~isa(this.bioModel,'matRad_BiologicalModel')
+    this.bioModel = matRad_BiologicalModel.validate(this.bioModel,radiationMode, this.providedQuantities(this.machine));
+end
+
+if any(strcmp(this.bioModel.requiredQuantities, 'LET'))
+
+    this.calcLET = true;
 end
 
 dij = struct();
 
-if ~isnan(this.bioParam.RBE)
-    dij.RBE = this.bioParam.RBE; 
+if matRad_ispropCompat(this.bioModel, 'RBE') && ~isnan(this.bioModel.RBE)
+    dij.RBE = this.bioModel.RBE; 
 end
 
 %store CT grid
@@ -78,15 +88,11 @@ dij.ctGrid.resolution = ct.resolution;
 
 % to guarantee downwards compatibility with data that does not have
 % ct.x/y/z
-if ~any(isfield(ct,{'x','y','z'}))
-    dij.ctGrid.x = ct.resolution.x*[0:ct.cubeDim(2)-1]-ct.resolution.x/2;
-    dij.ctGrid.y = ct.resolution.y*[0:ct.cubeDim(1)-1]-ct.resolution.y/2;
-    dij.ctGrid.z = ct.resolution.z*[0:ct.cubeDim(3)-1]-ct.resolution.z/2;
-else
-    dij.ctGrid.x = ct.x;
-    dij.ctGrid.y = ct.y;   
-    dij.ctGrid.z = ct.z;
-end
+ct = matRad_getWorldAxes(ct);
+
+dij.ctGrid.x = ct.x;
+dij.ctGrid.y = ct.y;   
+dij.ctGrid.z = ct.z;
 
 dij.ctGrid.dimensions  = [numel(dij.ctGrid.y) numel(dij.ctGrid.x) numel(dij.ctGrid.z)];
 dij.ctGrid.numOfVoxels = prod(dij.ctGrid.dimensions);
@@ -106,13 +112,14 @@ dij.doseGrid.dimensions  = [numel(dij.doseGrid.y) numel(dij.doseGrid.x) numel(di
 dij.doseGrid.numOfVoxels = prod(dij.doseGrid.dimensions);
 matRad_cfg.dispInfo('Dose grid has dimensions %dx%dx%d\n',dij.doseGrid.dimensions(1),dij.doseGrid.dimensions(2),dij.doseGrid.dimensions(3));
 
-dij.doseGrid.isoCenterOffset = [dij.doseGrid.resolution.x - dij.ctGrid.resolution.x ...
+dij.doseGrid.cubeCoordOffset = [dij.doseGrid.resolution.x - dij.ctGrid.resolution.x ...
     dij.doseGrid.resolution.y - dij.ctGrid.resolution.y ...
     dij.doseGrid.resolution.z - dij.ctGrid.resolution.z];
 
 % meta information for dij
 dij.numOfBeams         = numel(stf);
-dij.numOfScenarios     = this.multScen.numOfCtScen;
+dij.numOfScenarios     = this.multScen.totNumScen;
+
 dij.numOfRaysPerBeam   = [stf(:).numOfRays];
 dij.totalNumOfBixels   = sum([stf(:).totalNumOfBixels]);
 dij.totalNumOfRays     = sum(dij.numOfRaysPerBeam);
@@ -171,12 +178,11 @@ this.VdoseGrid = unique(vertcat(tmpVdoseGridScen{:}));
 this.VdoseGridScenIx = cellfun(@(c) ismember(this.VdoseGrid,c), tmpVdoseGridScen,'UniformOutput',false);
 
 
-% Convert CT subscripts to linear indices.
-[this.yCoordsV_vox, this.xCoordsV_vox, this.zCoordsV_vox] = ind2sub(ct.cubeDim,this.VctGrid);
+% Convert CT subscripts to world coordinates.
+this.voxWorldCoords = matRad_cubeIndex2worldCoords(this.VctGrid,dij.ctGrid);
 
-
-% Convert CT subscripts to coarse linear indices.
-[this.yCoordsV_voxDoseGrid, this.xCoordsV_voxDoseGrid, this.zCoordsV_voxDoseGrid] = ind2sub(dij.doseGrid.dimensions,this.VdoseGrid);
+% Convert dosegrid subscripts to world coordinates
+this.voxWorldCoordsDoseGrid = matRad_cubeIndex2worldCoords(this.VdoseGrid,dij.doseGrid);
 
 %Create helper masks
 this.VdoseGridMask = false(dij.doseGrid.numOfVoxels,1);
@@ -185,21 +191,18 @@ this.VdoseGridMask(this.VdoseGrid) = true;
 this.VctGridMask = false(prod(ct.cubeDim),1);
 this.VctGridMask(this.VctGrid) = true;
 
-% load machine file from base data folder
-this.machine = this.loadMachine(radiationMode,machine);
-
 this.doseGrid = dij.doseGrid;
 
 %Voxel selection for dose calculation
 % ser overlap prioriites
-cst = matRad_setOverlapPriorities(cst);
+this.cstDoseGrid = matRad_setOverlapPriorities(cst);
 
 % resizing cst to dose cube resolution
-cst = matRad_resizeCstToGrid(cst,dij.ctGrid.x,dij.ctGrid.y,dij.ctGrid.z,...
+this.cstDoseGrid = matRad_resizeCstToGrid(this.cstDoseGrid,dij.ctGrid.x,dij.ctGrid.y,dij.ctGrid.z,...
    dij.doseGrid.x,dij.doseGrid.y,dij.doseGrid.z);
 
 %structures that are selected here will be included in dose calculation over the robust scenarios
-this.robustVoxelsOnGrid = matRad_selectVoxelsFromCst(cst, dij.doseGrid, this.selectVoxelsInScenarios);
+this.robustVoxelsOnGrid = matRad_selectVoxelsFromCst(this.cstDoseGrid, dij.doseGrid, this.selectVoxelsInScenarios);
 
 end
 

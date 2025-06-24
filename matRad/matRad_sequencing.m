@@ -24,7 +24,7 @@ function resultGUI = matRad_sequencing(resultGUI,stf,dij,pln,visBool)
 % 
 % This file is part of the matRad project. It is subject to the license 
 % terms in the LICENSE file found in the top-level directory of this 
-% distribution and at https://github.com/e0404/matRad/LICENSES.txt. No part 
+% distribution and at https://github.com/e0404/matRad/LICENSE.md. No part 
 % of the matRad project, including this file, may be copied, modified, 
 % propagated, or distributed except according to the terms contained in the 
 % LICENSE file.
@@ -35,6 +35,10 @@ matRad_cfg = MatRad_Config.instance();
 
 if nargin < 5
     visBool = 0;
+end
+
+if ~isfield(pln,'propSeq')
+    pln.propSeq = struct('runSequencing',false);
 end
 
 if strcmp(pln.radiationMode,'photons') && (pln.propSeq.runSequencing || pln.propOpt.runDAO)

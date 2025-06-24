@@ -31,7 +31,7 @@ function [resultGUI] = matRad_SFUDoptimization(pln, cst, dij, ct, stf)
 % 
 % This file is part of the matRad project. It is subject to the license 
 % terms in the LICENSE file found in the top-level directory of this 
-% distribution and at https://github.com/e0404/matRad/LICENSES.txt. No part 
+% distribution and at https://github.com/e0404/matRad/LICENSE.md. No part 
 % of the matRad project, including this file, may be copied, modified, 
 % propagated, or distributed except according to the terms contained in the 
 % LICENSE file.
@@ -66,7 +66,7 @@ for i = 1:size(cst,1)
         
         % biological dose splitting for carbon
         if strcmp(pln.propOpt.bioOptimization, 'LEMIV_effect') || ...
-                        strcmp(pln.propOpt.bioOptimization, 'LEMIV_RBExD')
+                        strcmp(pln.propOpt.bioOptimization, 'LEMIV_RBExDose')
             
             % dose per fraction
             fx_dose = obj.getDoseParameters()/pln.numOfFractions;

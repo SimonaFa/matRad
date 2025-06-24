@@ -75,7 +75,7 @@ classdef matRad_ParticleHongPencilBeamEngine < DoseEngines.matRad_ParticlePencil
                     L = (1-kernels.weight).*L_Narr + kernels.weight.*L_Bro;
                 case 'multi'
                     sigmaSq = kernels.sigmaMulti.^2 + bixel.sigmaIniSq;
-                    L = sum([1 - sum(kernels.weightMulti,2), kernels.weightMulti] .* exp(-radialDist_sq ./ (2*sigmaSq))./(2*pi*sigmaSq),2);
+                    L = sum([1 - sum(kernels.weightMulti,2), kernels.weightMulti] .* exp(-bixel.radialDist_sq ./ (2*sigmaSq))./(2*pi*sigmaSq),2);
                 otherwise
                     %Sanity check
                     matRad_cfg = MatRad_Config.instance();
@@ -113,10 +113,14 @@ classdef matRad_ParticleHongPencilBeamEngine < DoseEngines.matRad_ParticlePencil
             end
 %}
             if this.calcBioDose                               
-                [bixelAlpha,bixelBeta] = this.bioParam.calcLQParameterForKernel(bixel,kernels);
+                % This updates the info in bixel adding the necessary
+                % quantities
+                bixel = this.bioModel.calcBiologicalQuantitiesForBixel(bixel,kernels);
 
-                bixel.mAlphaDose = bixel.physicalDose .* bixelAlpha;
-                bixel.mSqrtBetaDose = bixel.physicalDose .* sqrt(bixelBeta);
+                if isa(this.bioModel, 'matRad_LQBasedModel')
+                    bixel.mAlphaDose    = bixel.physicalDose .* bixel.alpha;
+                    bixel.mSqrtBetaDose = bixel.physicalDose .* sqrt(bixel.beta);
+                end
             end  
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             if this.calcClusterDose
@@ -287,7 +291,10 @@ classdef matRad_ParticleHongPencilBeamEngine < DoseEngines.matRad_ParticlePencil
                 return;
             end
 
-            checkMeta = all(isfield(machine.meta,{'SAD','BAMStoIsoDist','LUT_bxWidthminFWHM','dataType'}));
+            checkMeta = all(isfield(machine.meta,{'SAD','BAMStoIsoDist','dataType'}));
+            
+            %Superseded names from older machine file versions
+            checkMeta = checkMeta && any(isfield(machine.meta,{'LUTspotSize','LUT_bxWidthminFWHM'}));
 
             dataType = machine.meta.dataType;
             if strcmp(dataType,'singleGauss')

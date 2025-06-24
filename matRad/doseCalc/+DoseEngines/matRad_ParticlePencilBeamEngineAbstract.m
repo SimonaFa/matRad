@@ -33,10 +33,10 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
         calcCDScatteringFromDose    = false;
         includeElectrons            = false;
 
-        cutOffMethod = 'integral' % or 'relative'
-
         airOffsetCorrection  = true;    % Corrects WEPL for SSD difference to kernel database
-        lateralModel = 'auto';          % Lateral Model used. 'auto' uses the most accurate model available (i.e. multiple Gaussians). 'single','double','multi' try to force a singleGaussian or doubleGaussian model, if available
+        lateralModel = 'fast';          % Lateral Model used. 'auto' uses the most accurate model available (i.e. multiple Gaussians), 'fastest' uses the most simple model. 'single','double','multi' try to force a singleGaussian or doubleGaussian model, if available
+
+        cutOffMethod = 'integral';      % or 'relative' - describes how to calculate the lateral dosimetric cutoff
 
         visBoolLateralCutOff = false;   % Boolean switch for visualization during+ LeteralCutOff calculation
     end
@@ -46,6 +46,8 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
         vTissueIndex;                   % Stores tissue indices available in the matRad base data
         vAlphaX;                        % Stores Photon Alpha
         vBetaX;                         % Stores Photon Beta
+
+        bioKernelQuantities;             % Kernel quantites to request from the machine data for biological dose calculation
     end
 
     methods
@@ -84,23 +86,29 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
             
             matRad_cfg = MatRad_Config.instance();
 
+            singleAvailable = all(arrayfun(fValidateSingle,this.machine.data));
+            doubleAvailable = all(arrayfun(fValidateDouble,this.machine.data));
+            multiAvailable = all(arrayfun(fValidateMulti,this.machine.data));
+
+            matRad_cfg.dispInfo('''%s'' selected for lateral beam model, checking machine...\n',this.lateralModel);
+
             switch this.lateralModel
                 case 'single'
-                    if ~all(arrayfun(fValidateSingle,this.machine.data))
+                    if ~singleAvailable
                         matRad_cfg.dispWarning('Chosen Machine does not support a singleGaussian Pencil-Beam model!');
                         this.lateralModel = 'auto';
                     end
                 case 'double'
-                    if ~all(arrayfun(fValidateDouble,this.machine.data))
+                    if ~doubleAvailable
                         matRad_cfg.dispWarning('Chosen Machine does not support a doubleGaussian Pencil-Beam model!');
                         this.lateralModel = 'auto';
                     end
                 case 'multi'
-                    if ~all(arrayfun(fValidateMulti,this.machine.data))
+                    if ~multiAvailable
                         matRad_cfg.dispWarning('Chosen Machine does not support a multiGaussian Pencil-Beam model!');
                         this.lateralModel = 'auto';
                     end
-                case 'auto'
+                case {'auto','fast'}
                     %Do nothing, will be handled below
                 otherwise
                     matRad_cfg.dispError('Lateral model ''%s'' not known!',this.lateralModel);
@@ -109,12 +117,24 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
             %Now check if we need tho chose the lateral model because it
             %was set to auto
             if strcmp(this.lateralModel,'auto') 
-                if all(arrayfun(fValidateMulti,this.machine.data))
+                if multiAvailable
                     this.lateralModel = 'multi';
-                elseif all(arrayfun(fValidateDouble,this.machine.data))
+                elseif doubleAvailable
                     this.lateralModel = 'double';
-                elseif all(arrayfun(fValidateSingle,this.machine.data))
+                elseif singleAvailable
                     this.lateralModel = 'single';
+                else
+                    matRad_cfg.dispError('Invalid kernel model!');
+                end
+            end
+
+            if strcmp(this.lateralModel,'fast')
+                if singleAvailable
+                    this.lateralModel = 'single';
+                elseif doubleAvailable
+                    this.lateralModel = 'double';
+                elseif multiAvailable
+                    this.lateralModel = 'multi';
                 else
                     matRad_cfg.dispError('Invalid kernel model!');
                 end
@@ -232,7 +252,13 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
                     matRad_cfg = MatRad_Config.instance();
                     matRad_cfg.dispError('Invalid Lateral Model');
             end
-                   
+
+            if ~isempty(this.bioKernelQuantities)
+                for i = 1:numel(this.bioKernelQuantities)
+                    X.(this.bioKernelQuantities{i}) = baseData.(this.bioKernelQuantities{i});
+                end
+            end
+            
             % LET
             if this.calcLET
                 X.LET = baseData.LET;
@@ -370,7 +396,8 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
                 end
             end
 
-            X = structfun(@(v) matRad_interp1(depths,v,bixel.radDepths,'nearest'),X,'UniformOutput',false); %Extrapolate to zero?
+            %X = structfun(@(v) matRad_interp1(depths,v,bixel.radDepths,'nearest'),X,'UniformOutput',false); %Extrapolate to zero?
+            X = structfun(@(v) matRad_interp1(depths,v,bixel.radDepths(:),'linear'),X,'UniformOutput',false); %Extrapolate to zero?
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         if this.calcClusterDoseFromFluence
             if isfield(baseData, 'Fluence')
@@ -532,20 +559,17 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
             if ~isnan(this.constantRBE)
                 dij.RBE = this.constantRBE;
             end
-            
-            % TODO: this is clumsy and needs to be changed with the
-            % biomodel update
-            if this.bioParam.bioOpt
-                this.calcBioDose = true;
-            end
+  
+            if ~isa(this.bioModel, 'matRad_EmptyBiologicalModel') && ~isa(this.bioModel, 'matRad_ConstantRBE')
+                % This is independent of the biological model implemented.
+                % Not performed for 'none' and 'constRBE' because not
+                % neccessary. We could as well always do this calculation,
+                % probably no great benefit in avoiding it
 
-            % Load biologicla base data if needed
-            if this.calcBioDose
-                dij = this.loadBiologicalBaseData(cst,dij);
-                % allocate alpha and beta dose container and sparse matrices in the dij struct,
-                % for more informations see corresponding method
+                dij = this.loadBiologicalBaseData(dij);
+
                 dij = this.allocateBioDoseContainer(dij);
-            end           
+            end
 
             % allocate LET containner and let sparse matrix in dij struct
             if this.calcLET
@@ -599,23 +623,16 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
             this.calcLateralParticleCutOff(this.dosimetricLateralCutOff,currBeam);
         end
         
-        function dij = loadBiologicalBaseData(this,cst,dij)
+        function dij = loadBiologicalBaseData(this,dij)
             matRad_cfg = MatRad_Config.instance();
 
             matRad_cfg.dispInfo('Initializing biological dose calculation...\n');
             
             numOfCtScen = numel(this.VdoseGridScenIx);
-
-
-            cstDownsampled = matRad_setOverlapPriorities(cst);
-
-            % resizing cst to dose cube resolution
-            cstDownsampled = matRad_resizeCstToGrid(cstDownsampled,dij.ctGrid.x,dij.ctGrid.y,dij.ctGrid.z,...
-                dij.doseGrid.x,dij.doseGrid.y,dij.doseGrid.z);
-            
+           
             tmpScenVdoseGrid = cell(numOfCtScen,1);
 
-            [dij.ax,dij.bx] = matRad_getPhotonLQMParameters(cstDownsampled,dij.doseGrid.numOfVoxels,this.VdoseGrid);  
+            [dij.ax,dij.bx] = matRad_getPhotonLQMParameters(this.cstDoseGrid,dij.doseGrid.numOfVoxels,this.VdoseGrid);  
 
             for s = 1:numOfCtScen            
                 tmpScenVdoseGrid{s} = this.VdoseGrid(this.VdoseGridScenIx{s});
@@ -626,58 +643,26 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
                 this.vBetaX{s}          = dij.bx{s}(tmpScenVdoseGrid{s});
                 this.vTissueIndex{s}    = zeros(size(tmpScenVdoseGrid{s},1),1);
             end
-                   
-            if strcmp(this.bioParam.model,'LEM') 
-                matRad_cfg.dispInfo('\tUsing LEM model with precomputed kernels\n');                    
-
-                if isfield(this.machine.data,'alphaX') && isfield(this.machine.data,'betaX')
-                    for i = 1:size(cstDownsampled,1)
-
-                        % check if cst is compatiable
-                        if ~isempty(cstDownsampled{i,5}) && isfield(cstDownsampled{i,5},'alphaX') && isfield(cstDownsampled{i,5},'betaX')
-
-                            % check if base data contains alphaX and betaX
-                            IdxTissue = find(ismember(this.machine.data(1).alphaX,cstDownsampled{i,5}.alphaX) & ...
-                                ismember(this.machine.data(1).betaX,cstDownsampled{i,5}.betaX));
-
-                            % check consitency of biological baseData and cst settings
-                            if ~isempty(IdxTissue)
-                                for s = 1:numOfCtScen
-                                    tmpScenVdoseGrid = this.VdoseGrid(this.VdoseGridScenIx{s});
-                                    isInVdoseGrid = ismember(tmpScenVdoseGrid,cstDownsampled{i,4}{s});
-                                    this.vTissueIndex{s}(isInVdoseGrid) = IdxTissue;
-                                end
-                            else
-                                matRad_cfg.dispError('Biological base data and cst are inconsistent!');
-                            end
-
-                        else
-                            for s = 1:numOfCtScen
-                                this.vTissueIndex{s}(:) = 1;
-                            end
-                            matRad_cfg.dispWarning('\tTissue type of %s was set to 1\n',cstDownsampled{i,2});
-                        end
-                    end
-                    dij.vTissueIndex = this.vTissueIndex;
-                    matRad_cfg.dispInfo('done.\n');
-                else
-                    matRad_cfg.dispError('Base data is missing alphaX and/or betaX!');
-                end
-            elseif any(strcmp(this.bioParam.model,{'HEL','MCN','WED'}))
-                matRad_cfg.dispInfo('\tUsing LET-dependent model\n');
-                if ~this.calcLET
-                    matRad_cfg.dispWarning('Forcing LET calculation as it is required for LET-dependent models!');
-                    this.calcLET = true;
-                end
-            else
-                matRad_cfg.dispError('Unknown Biological Model!');
+           
+            if isa(this.bioModel,'matRad_LQKernelBasedModel') || isa(this.bioModel,'matRad_LQRBETabulatedModel')
+                this.bioKernelQuantities = this.bioModel.kernelQuantities;
+                [this.vTissueIndex] = this.bioModel.getTissueInformation(this.machine,this.cstDoseGrid,dij,this.vAlphaX, this.vBetaX,this.VdoseGrid, this.VdoseGridScenIx);
             end
 
+            if isa(this.bioModel,'matRad_LETbasedModels')
+                this.calcLET = true;
+            end
+
+            
         end
 
         function dij = allocateBioDoseContainer(this,dij)
             % allocate space for container used in bio optimization
             dij = this.allocateQuantityMatrixContainers(dij,{'mAlphaDose','mSqrtBetaDose'});
+
+            % This does not make sense here, works only for LQbased models (?)
+            % TODO: move it from here
+            this.calcBioDose = true;
         end
 
         function dij = allocateLETContainer(this,dij)
@@ -755,7 +740,7 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
             %
             % This file is part of the matRad project. It is subject to the license
             % terms in the LICENSE file found in the top-level directory of this
-            % distribution and at https://github.com/e0404/matRad/LICENSES.txt. No part
+            % distribution and at https://github.com/e0404/matRad/LICENSE.md. No part
             % of the matRad project, including this file, may be copied, modified,
             % propagated, or distributed except according to the terms contained in the
             % LICENSE file.
@@ -833,7 +818,7 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
                 %}
 
                 % consider range shifter for protons if applicable
-                if  strcmp(this.machine.meta.radiationMode,'protons') && rangeShifterLUT(i).eqThickness > 0  && ~strcmp(this.machine.meta.machine,'Generic')
+                if  strcmp(this.machine.meta.radiationMode,'protons') && rangeShifterLUT(i).eqThickness > 0 %&& ~strcmp(this.machine.meta.machine,'Generic')
 
                     %get max range shift
                     sigmaRashi = matRad_calcSigmaRashi(this.machine.data(energyIx).energy, ...
@@ -942,30 +927,30 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
                         if abs((cumArea(end)./(idd(j)))-1)*100 > relativeTolerance
                             matRad_cfg.dispWarning('LateralParticleCutOff: shell integration is wrong !')
                         end
-                        
-                        %find radius at which integrated dose is becoming
-                        %bigger than cutoff * IDD
-                        if (depthValues(j)>=222 && depthValues(j)<=226)
-                            boh = 1;
-                        end
-                        if strcmp(this.cutOffMethod, 'integral')
-                            IX = find(cumArea >= idd(j) * cutOffLevel,1, 'first');
-                            this.machine.data(energyIx).LatCutOff.CompFac = cutOffLevel^-1;
-                        elseif strcmp(this.cutOffMethod, 'relative')
-                            IX = find(dose_r <= (1-cutOffLevel) * max(dose_r), 1, 'first');
-                            relFac = cumArea(IX)./idd(j); % or idd(j)
-                            this.machine.data(energyIx).LatCutOff.CompFac(j) = relFac^-1;
+
+                        % Find radius at which integrated dose becomes
+                        % bigger than cutoff * IDD
+
+                        switch this.cutOffMethod
+                            case 'integral'
+                                IX = find(cumArea >= idd(j) * cutOffLevel,1, 'first');
+                                this.machine.data(energyIx).LatCutOff.CompFac = cutOffLevel^-1;
+                            case 'relative'
+                                IX = find(dose_r <= (1-cutOffLevel) * max(dose_r), 1, 'first');
+                                relFac = cumArea(IX)./cumArea(end); % (or idd(j)) to find the appropriate integral of dose
+                                this.machine.data(energyIx).LatCutOff.CompFac(j) = relFac^-1;
+                            otherwise
+                                matRad_cfg.dispError('LateralParticleCutOff: Invalid Cutoff Method. Must be ''integral'' or ''relative''!');
                         end
 
                         if isempty(IX)
                             depthDoseCutOff = Inf;
-                            matRad_cfg.dispWarning('LateralParticleCutOff: Couldnt find lateral cut off !')
+                            matRad_cfg.dispWarning('LateralParticleCutOff: Couldnt find lateral cut off!')
                         elseif isnumeric(IX)
                             depthDoseCutOff = r_mid(IX);
                         end
 
                         this.machine.data(energyIx).LatCutOff.CutOff(j) = depthDoseCutOff;
-
                     end
                 end
             end
@@ -1214,7 +1199,25 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
             % helper function for energy selection
             r2 = round(a*10^b)/10^b; 
         end
+    end
 
-    end   
+    methods (Static)
+        %Used to check against a machine file if a specific quantity can be
+        %computed.
+        function q = providedQuantities(machine)            
+            q = {};
+            if all(isfield(machine.data,{'energy','Z','depths','initFocus'})) && any(isfield(machine.data,{'sigma','weight','multiGauss'}))
+                q{end+1} = 'physicalDose';
+                if all(isfield(machine.data,{'alphaX','betaX','alpha','beta'}))
+                    q{end+1} = 'alpha';
+                    q{end+1} = 'beta';
+                end
+            end
+            
+            if ~isempty(q{1}) && isfield(machine.data,'LET')
+                q{end+1} = 'LET';
+            end
+        end
+    end
 end
 

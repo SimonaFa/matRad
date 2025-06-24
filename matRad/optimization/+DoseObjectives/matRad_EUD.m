@@ -11,7 +11,7 @@ classdef matRad_EUD < DoseObjectives.matRad_DoseObjective
 % 
 % This file is part of the matRad project. It is subject to the license 
 % terms in the LICENSE file found in the top-level directory of this 
-% distribution and at https://github.com/e0404/matRad/LICENSES.txt. No part 
+% distribution and at https://github.com/e0404/matRad/LICENSE.md. No part 
 % of the matRad project, including this file, may be copied, modified, 
 % propagated, or distributed except according to the terms contained in the 
 % LICENSE file.
@@ -96,7 +96,8 @@ classdef matRad_EUD < DoseObjectives.matRad_DoseObjective
             fDoseGrad = 2 * nthroot(1/numel(dose),k) * powersum^((1-k)/k) * (dose.^(k-1)) .* (nthroot(powersum/numel(dose),k) - obj.parameters{1});
             %end
             if any(~isfinite(fDoseGrad)) % check for inf and nan for numerical stability
-                error(['EUD computation failed. Reduce exponent to resolve numerical problems.']);
+                matRad_cfg = MatRad_Config.instance();
+                matRad_cfg.dispError(['EUD computation failed. Reduce exponent to resolve numerical problems.']);
             end
         end
     end

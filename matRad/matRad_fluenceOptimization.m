@@ -25,7 +25,7 @@ function [resultGUI,optimizer] = matRad_fluenceOptimization(dij,cst,pln,wInit)
 %
 % This file is part of the matRad project. It is subject to the license
 % terms in the LICENSE file found in the top-level directory of this
-% distribution and at https://github.com/e0404/matRad/LICENSES.txt. No part
+% distribution and at https://github.com/e0404/matRad/LICENSE.md. No part
 % of the matRad project, including this file, may be copied, modified,
 % propagated, or distributed except according to the terms contained in the
 % LICENSE file.
@@ -91,7 +91,7 @@ cst = matRad_resizeCstToGrid(cst,dij.ctGrid.x,dij.ctGrid.y,dij.ctGrid.z,...
                                  dij.doseGrid.x,dij.doseGrid.y,dij.doseGrid.z);
 
 % Get rid of voxels that are not interesting for the optimization problem
-if ~isfield(pln.propOpt, 'clearUnusedVoxels')
+if ~isfield(pln,'propOpt') || ~isfield(pln.propOpt, 'clearUnusedVoxels')
     pln.propOpt.clearUnusedVoxels = matRad_cfg.defaults.propOpt.clearUnusedVoxels;
 end
 
@@ -129,6 +129,94 @@ end
 ixTarget       = ixTarget(i);
 wOnes          = ones(dij.totalNumOfBixels,1);
 
+%Check how to use 4D data
+if isfield(pln,'propOpt') && isfield(pln.propOpt,'scen4D')
+    scen4D = pln.propOpt.scen4D;
+else
+    scen4D = 1; %Use only first 4D scenario for optimization
+end
+
+% Workaround until future release with consistent data management
+totNumCtScen = size(dij.physicalDose,1);
+
+% Validate / Create Scenario model
+if ~isfield(pln,'multScen')
+    pln.multScen = 'nomScen';
+end
+
+if ~isa(pln.multScen,'matRad_ScenarioModel')
+    pln.multScen = matRad_ScenarioModel.create(pln.multScen,struct('numOfCtScen',totNumCtScen));
+end
+
+if ~isfield(pln,'bioModel')
+    pln.bioModel = 'none';
+end
+
+if ~isa(pln.bioModel,'matRad_BiologicalModel')
+    pln.bioModel = matRad_BiologicalModel.validate(pln.bioModel,pln.radiationMode);
+end
+
+%If "all" provided, use all scenarios
+if isequal(scen4D,'all')
+    scen4D = 1:totNumCtScen;
+end
+
+if ~isfield(pln.propOpt, 'quantityOpt') || isempty(pln.propOpt.quantityOpt)
+    pln.propOpt.quantityOpt = pln.bioModel.defaultReportQuantity;
+    matRad_cfg.dispWarning('quantityOpt was not provided, using quantity suggested by biological model: %s',pln.propOpt.quantityOpt);    
+end
+
+% Check optimization quantity
+switch pln.propOpt.quantityOpt
+    case 'effect'
+        backProjection = matRad_EffectProjection;
+    case 'RBExDose'
+        %Capture special case of constant RBE
+        if isa(pln.bioModel,'matRad_ConstantRBE') || (isstruct(pln.bioModel) && strcmp(pln.bioModel.model, 'constRBE'))
+            backProjection = matRad_ConstantRBEProjection;
+        else
+            backProjection = matRad_VariableRBEProjection;
+        end
+    case 'cluster_Dose'
+        backProjection = matRad_ClusterDoseProjection;
+    case 'physicalDose'
+        backProjection = matRad_DoseProjection;
+
+    case 'BED'
+        backProjection = matRad_BEDProjection;
+    otherwise
+        warning(['Did not recognize biological setting ''' pln.propOpt.quantityOpt '''!\nUsing physical dose optimization!']);
+        backProjection = matRad_DoseProjection;
+end
+
+% Check minimum biological quantities available
+if isa(backProjection,'matRad_EffectProjection') && ~all(isfield(dij,{'ax','bx'}))
+    matRad_cfg.dispWarning('Biological optimization requested, but no ax & bx provided in dij. Getting from cst...');
+
+    %First get the voxels where we need it
+    validScen = ~cellfun(@isempty,dij.physicalDose);
+    d = cellfun(@(D) D*ones(dij.totalNumOfBixels,1),dij.physicalDose(validScen),'UniformOutput',false);
+    d = sum(cell2mat(d'),2);
+    ixZeroDose = d == 0;
+
+    numOfCtScenarios = numel(cst{1,4});
+    for i = 1:numOfCtScenarios
+        dij.ax{i} = zeros(dij.doseGrid.numOfVoxels,1);
+        dij.bx{i} = zeros(dij.doseGrid.numOfVoxels,1);
+
+        for v = 1:size(cst,1)
+            %We already did the overlap stuff so we do not need to care for
+            %overlaps here
+            dij.ax{i}(cst{v,4}{i}) = cst{v,5}.alphaX;
+            dij.bx{i}(cst{v,4}{i}) = cst{v,5}.betaX;
+        end
+
+        dij.ax{i}(ixZeroDose) = 0;
+        dij.bx{i}(ixZeroDose) = 0;
+    end
+end
+
+
 % calculate initial beam intensities wInit
 matRad_cfg.dispInfo('Estimating initial weights... ');
 
@@ -137,7 +225,7 @@ if exist('wInit','var')
     matRad_cfg.dispInfo('chosen provided wInit!\n');
 
     % Write ixDose which is needed for the optimizer
-    if pln.bioParam.bioOpt
+    if isa(backProjection, 'matRad_EffectProjection')
         dij.ixDose  = dij.bx~=0;
 
         %pre-calculations
@@ -145,7 +233,7 @@ if exist('wInit','var')
         dij.gamma(dij.ixDose) = dij.ax(dij.ixDose)./(2*dij.bx(dij.ixDose));
     end
 
-elseif strcmp(pln.bioParam.model,'constRBE') && strcmp(pln.radiationMode,'protons')
+elseif isa(backProjection, 'matRad_ConstantRBEProjection') && strcmp(pln.radiationMode,'protons')
     % check if a constant RBE is defined - if not use 1.1
     if ~isfield(dij,'RBE')
         dij.RBE = 1.1;
@@ -156,15 +244,14 @@ elseif strcmp(pln.bioParam.model,'constRBE') && strcmp(pln.radiationMode,'proton
     wInit       = wOnes * bixelWeight;
     matRad_cfg.dispInfo('chosen uniform weight of %f!\n',bixelWeight);
 
-elseif pln.bioParam.bioOpt
-    % retrieve photon LQM parameter 
+elseif isa(backProjection, 'matRad_EffectProjection')
+    % retrieve photon LQM parameter
     [ax,bx] = matRad_getPhotonLQMParameters(cst,dij.doseGrid.numOfVoxels);
     checkAxBx = cellfun(@(ax1,bx1,ax2,bx2) isequal(ax1(ax1~=0),ax2(ax1~=0)) && isequal(bx1(bx1~=0),bx2(bx1~=0)),dij.ax,dij.bx,ax,bx);
     if ~all(checkAxBx)
         matRad_cfg.dispError('Inconsistent biological parameters in dij.ax and/or dij.bx - please recalculate dose influence matrix before optimization!\n');
     end
 
-       
     for i = 1:size(cst,1)
 
         for j = 1:size(cst{i,6},2)
@@ -175,22 +262,29 @@ elseif pln.bioParam.bioOpt
 
         end
     end
-    
+
     for s = 1:numel(dij.bx)
         dij.ixDose{s}  = dij.bx{s}~=0;
     end
-
-    if isequal(pln.bioParam.quantityOpt,'effect')
-
-        effectTarget = cst{ixTarget,5}.alphaX * doseTarget + cst{ixTarget,5}.betaX * doseTarget^2;
+    
+    doseTmp = dij.physicalDose{1}*wOnes;
+    if all(isfield(dij,{'mAlphaDose','mSqrtBetaDose'}))
         aTmp = dij.mAlphaDose{1}*wOnes;
         bTmp = dij.mSqrtBetaDose{1} * wOnes;
+    else        
+        aTmp = doseTmp.*dij.ax{1};
+        bTmp = doseTmp.*sqrt(dij.bx{1});
+    end
+
+    if isequal(pln.propOpt.quantityOpt,'effect')
+
+        effectTarget = cst{ixTarget,5}.alphaX * doseTarget + cst{ixTarget,5}.betaX * doseTarget^2;
         p = sum(aTmp(V)) / sum(bTmp(V).^2);
         q = -(effectTarget * length(V)) / sum(bTmp(V).^2);
 
         wInit        = -(p/2) + sqrt((p^2)/4 -q) * wOnes;
 
-    elseif isequal(pln.bioParam.quantityOpt,'RBExD')
+    elseif isequal(pln.propOpt.quantityOpt,'RBExDose')
 
         %pre-calculations
         for s = 1:numel(dij.ixDose)
@@ -200,10 +294,6 @@ elseif pln.bioParam.bioOpt
 
 
         % calculate current effect in target
-        aTmp = dij.mAlphaDose{1}*wOnes;
-        bTmp = dij.mSqrtBetaDose{1} * wOnes;
-        doseTmp = dij.physicalDose{1}*wOnes;
-
         CurrEffectTarget = aTmp(V) + bTmp(V).^2;
         % ensure a underestimated biological effective dose
         TolEstBio        = 1.2;
@@ -211,9 +301,20 @@ elseif pln.bioParam.bioOpt
         maxCurrRBE = max(-cst{ixTarget,5}.alphaX + sqrt(cst{ixTarget,5}.alphaX^2 + ...
             4*cst{ixTarget,5}.betaX.*CurrEffectTarget)./(2*cst{ixTarget,5}.betaX*doseTmp(V)));
         wInit    =  ((doseTarget)/(TolEstBio*maxCurrRBE*max(doseTmp(V))))* wOnes;
+
+    elseif strcmp(pln.propOpt.quantityOpt, 'BED')
+        abr = cst{ixTarget,5}.alphaX./cst{ixTarget,5}.betaX;
+        meanBED = mean((aTmp(V) + bTmp(V).^2)./cst{ixTarget,5}.alphaX);
+
+        BEDTarget = doseTarget.*(1 + doseTarget./abr);
+
+        bixelWeight =  BEDTarget/meanBED;
+        wInit       = wOnes * bixelWeight;
+
     end
 
     matRad_cfg.dispInfo('chosen weights adapted to biological dose calculation!\n');
+
 else
     
     if isfield(dij, 'mClusterDose')
@@ -235,18 +336,6 @@ end
 
 %% calculate probabilistic quantities for probabilistic optimization if at least
 % one robust objective is defined
-
-%Check how to use 4D data
-if isfield(pln,'propOpt') && isfield(pln.propOpt,'scen4D')
-    scen4D = pln.propOpt.scen4D;
-else
-    scen4D = 1; %Use only first 4D scenario for optimization
-end
-
-%If "all" provided, use all scenarios
-if isequal(scen4D,'all')
-    scen4D = 1:size(dij.physicalDose,1);
-end
 
 linIxDIJ = find(~cellfun(@isempty,dij.physicalDose(scen4D,:,:)))';
 
@@ -280,28 +369,6 @@ else
     ixForOpt = linIxDIJ;
 end
 
-switch pln.bioParam.quantityOpt
-    case 'effect'
-        backProjection = matRad_EffectProjection;
-    case 'RBExD'
-        %Capture special case of constant RBE
-        if strcmp(pln.bioParam.model,'constRBE')
-            backProjection = matRad_ConstantRBEProjection;
-        else
-            backProjection = matRad_VariableRBEProjection;
-        end
-    case 'cluster_Dose'
-        backProjection = matRad_ClusterDoseProjection;
-    case 'physicalDose'
-        backProjection = matRad_DoseProjection;
-    case 'none'
-        backProjection = matRad_DoseProjection;
-        
-    otherwise
-        warning(['Did not recognize biological setting ''' pln.probOpt.bioOptimization '''!\nUsing physical dose optimization!']);
-        backProjection = matRad_DoseProjection;
-end
-
 %Give scenarios used for optimization
 backProjection.scenarios    = ixForOpt;
 backProjection.scenarioProb = pln.multScen.scenProb;
@@ -309,7 +376,7 @@ backProjection.nominalCtScenarios = linIxDIJ_nominalCT;
 %backProjection.scenDim      = pln.multScen
 
 optiProb = matRad_OptimizationProblem(backProjection);
-optiProb.quantityOpt = pln.bioParam.quantityOpt;
+
 if isfield(pln,'propOpt') && isfield(pln.propOpt,'useLogSumExpForRobOpt')
     optiProb.useLogSumExpForRobOpt = pln.propOpt.useLogSumExpForRobOpt;
 end
@@ -348,7 +415,13 @@ else
 end
 
 if ~isfield(pln.propOpt,'optimizer')
-    pln.propOpt.optimizer = 'IPOPT';
+    %While the default optimizer is IPOPT, we can try to fallback to
+    %fmincon in case it does not work for some reason
+    if ~matRad_OptimizerIPOPT.IsAvailable()
+        pln.propOpt.optimizer = 'fmincon';
+    else
+        pln.propOpt.optimizer = 'IPOPT';
+    end    
 end
 
 
@@ -357,11 +430,13 @@ switch pln.propOpt.optimizer
         optimizer = matRad_OptimizerIPOPT;
     case 'fmincon'
         optimizer = matRad_OptimizerFmincon;
+    case 'simulannealbnd'
+        optimizer = matRad_OptimizerSimulannealbnd;
     otherwise
         warning(['Optimizer ''' pln.propOpt.optimizer ''' not known! Fallback to IPOPT!']);
         optimizer = matRad_OptimizerIPOPT;
 end
-    
+
 if ~optimizer.IsAvailable()
     matRad_cfg.dispError(['Optimizer ''' pln.propOpt.optimizer ''' not available!']);
 end
@@ -378,12 +453,11 @@ resultGUI.usedOptimizer = optimizer;
 resultGUI.info = info;
 
 %Robust quantities
-if FLAG_ROB_OPT || numel(ixForOpt) > 1
-    Cnt = 1;
-    for i = find(~cellfun(@isempty,dij.physicalDose))'
-        tmpResultGUI = matRad_calcCubes(wOpt,dij,i);
-        resultGUI.([pln.bioParam.quantityVis '_' num2str(Cnt,'%d')]) = tmpResultGUI.(pln.bioParam.quantityVis);
-        Cnt = Cnt + 1;
+if pln.multScen.totNumScen > 1
+    for i = 1:pln.multScen.totNumScen
+        scenSubIx = pln.multScen.linearMask(i,:);
+        resultGUItmp = matRad_calcCubes(wOpt,dij,pln.multScen.sub2scenIx(scenSubIx(1),scenSubIx(2),scenSubIx(3)));
+        resultGUI = matRad_appendResultGUI(resultGUI,resultGUItmp,false,sprintf('scen%d',i));
     end
 end
 
