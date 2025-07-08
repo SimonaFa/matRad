@@ -104,10 +104,10 @@ if isfield(dij,'RBE') && isscalar(dij.RBE)
     end
 elseif any(cellfun(@(teststr) ~isempty(strfind(lower(teststr),'alpha')), fieldnames(dij)))
     % Load RBE models if MonteCarlo was calculated for multiple models
-    if isfield(dij,'RBE_models')
-        RBE_model = cell(1,length(dij.RBE_models));
-        for i = 1:length(dij.RBE_models)
-            RBE_model{i} = ['_' dij.RBE_models{i}];
+    if isfield(dij,'RBE_model')
+        RBE_model = cell(1,length(dij.RBE_model));
+        for i = 1:length(dij.RBE_model)
+            RBE_model{i} = ['_' dij.RBE_model{i}];
         end
     else
         RBE_model = {''};
@@ -122,13 +122,16 @@ elseif any(cellfun(@(teststr) ~isempty(strfind(lower(teststr),'alpha')), fieldna
                 wBeam = (resultGUI.w .* beamInfo(i).logIx);
 
                 % consider biological optimization
+                if isfield(dij, 'bx')
                 ix = dij.bx{ctScen} ~= 0 & resultGUI.(['physicalDose', beamInfo(i).suffix])(:) > 0;
                 ixWeighted = dij.bx{ctScen} ~= 0 & resultGUI.(['physicalDose', beamInfo(i).suffix])(:) > absoluteDoseWeightingThreshold;
+                end
 
                 % Calculate effect from alpha- and sqrtBetaDose
                 resultGUI.(['effect', RBE_model{j}, beamInfo(i).suffix])                = full(dij.(['mAlphaDose' RBE_model{j}]){scenNum} * wBeam + (dij.(['mSqrtBetaDose' RBE_model{j}]){scenNum} * wBeam).^2);
                 resultGUI.(['effect', RBE_model{j}, beamInfo(i).suffix])                = reshape(resultGUI.(['effect', RBE_model{j}, beamInfo(i).suffix]),dij.doseGrid.dimensions);
 
+                if isfield(dij, 'bx')
                 % Calculate RBExDose from the effect
                 resultGUI.(['RBExDose', RBE_model{j}, beamInfo(i).suffix])                 = zeros(size(resultGUI.(['effect', RBE_model{j}, beamInfo(i).suffix])));
                 resultGUI.(['RBExDose', RBE_model{j}, beamInfo(i).suffix])(ix)             = (sqrt(dij.ax{ctScen}(ix).^2 + 4 .* dij.bx{ctScen}(ix) .* resultGUI.(['effect', RBE_model{j}, beamInfo(i).suffix])(ix)) - dij.ax{ctScen}(ix))./(2.*dij.bx{ctScen}(ix));
@@ -152,6 +155,7 @@ elseif any(cellfun(@(teststr) ~isempty(strfind(lower(teststr),'alpha')), fieldna
                 SqrtBetaDoseCube                                                        = full(dij.(['mSqrtBetaDose' RBE_model{j}]){scenNum} * wBeam);
                 resultGUI.(['beta', RBE_model{j}, beamInfo(i).suffix])(ix)              = (SqrtBetaDoseCube(ix)./resultGUI.(['physicalDose', beamInfo(i).suffix])(ix)).^2;
                 resultGUI.(['SqrtBetaDoseCube', RBE_model{j}, beamInfo(i).suffix])(ix)  = SqrtBetaDoseCube(ix);
+                end            
             end
         end
     end

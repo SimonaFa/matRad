@@ -36,7 +36,8 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
 
         calcClusterDose        
         clusterDoseIP           
-        clusterDoseK               
+        clusterDoseK 
+        scoreTOPAS_RBE
 
         topasExecCommand; %Defaults will be set during construction according to TOPAS installation instructions and used system
 
@@ -96,7 +97,7 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
             'doseToWater',false,...
             'surfaceTrackCount',false,...
             'calcDij',false,...
-            'RBE',false,...
+            'RBE',0,...
             'RBE_model',{{'default'}},... % default is MCN for protons and LEM1 for ions
             'defaultModelProtons',{{'MCN'}},...
             'defaultModelCarbon',{{'LEM'}},...
@@ -432,6 +433,11 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
         function dij = calcDose(this,ct,cst,stf)
             % Instance of MatRad_Config class
             matRad_cfg = MatRad_Config.instance();
+
+            % Set radiation mode
+            if isfield(stf, 'radiationMode')
+                this.radiationMode = stf.radiationMode;
+            end
 
             % Set parameters for full Dij calculation
             if ~this.calcDoseDirect
@@ -1064,10 +1070,25 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
 
             % Save RBE models in dij for postprocessing in calcCubes
             if obj.scorer.RBE
-                dij.RBE_models = obj.MCparam.RBE_models;
+                %dij.RBE_model = obj.MCparam.RBE_model;
+                dij.RBE_model = obj.scorer.RBE_model;
+                if strcmp(dij.RBE_model, 'default')
+                    switch obj.radiationMode
+                        case 'protons'
+                            dij.RBE_model = obj.scorer.defaultModelProtons;
+                        case 'carbon'
+                            dij.RBE_model = obj.scorer.defaultModelCarbon;
+                    end
+                end
+                if isfield(obj.MCparam, 'ax')
                 dij.ax = obj.MCparam.ax;
+                end
+                if isfield(obj.MCparam, 'bx')
                 dij.bx = obj.MCparam.bx;
+                end
+                if isfield(obj.MCparam, 'abx')
                 dij.abx = obj.MCparam.abx;
+                end
             end
 
             % Get basic tallies from topasCubes for sparse matrix allocation
@@ -1093,9 +1114,15 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
 
             % Get unique tallies for RBE models
             if obj.scorer.RBE
-                for r = 1:length(obj.MCparam.RBE_models)
-                    dijTallies{end+1} = ['mAlphaDose_' obj.MCparam.RBE_models{r}];
-                    dijTallies{end+1} = ['mSqrtBetaDose_' obj.MCparam.RBE_models{r}];
+            
+                %for r = 1:length(obj.MCparam.RBE_model)
+                for r = 1:length(obj.scorer.RBE_model)
+                    %dijTallies{end+1} = ['mAlphaDose_' obj.MCparam.RBE_models{r}];
+                    %dijTallies{end+1} = ['mSqrtBetaDose_' obj.MCparam.RBE_models{r}];
+                    %dijTallies{end+1} = ['mAlphaDose_' obj.scorer.RBE_model{r}];
+                    %dijTallies{end+1} = ['mSqrtBetaDose_' obj.scorer.RBE_model{r}];
+                    dijTallies{end+1} = ['mAlphaDose_' dij.RBE_model{r}];
+                    dijTallies{end+1} = ['mSqrtBetaDose_' dij.RBE_model{r}];
                     %                     dijTallies{end+1} = 'alpha';
                     %                     dijTallies{end+1} = 'beta';
                 end
@@ -1409,7 +1436,7 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
             end
 
             % write RBE scorer
-            if obj.scorer.RBE
+            if obj.scorer.RBE || obj.scoreTOPAS_RBE
                 for i = 1:length(obj.scorer.RBE_model)
                     switch obj.radiationMode
                         case 'protons'
@@ -1419,6 +1446,9 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
                                 fname = fullfile(obj.topasFolder,filesep,obj.scorerFolder,filesep,obj.infilenames.Scorer_RBE_MCN);
                             elseif ~isempty(strfind(lower(obj.scorer.RBE_model{i}),'wed'))
                                 fname = fullfile(obj.topasFolder,filesep,obj.scorerFolder,filesep,obj.infilenames.Scorer_RBE_WED);
+                            elseif ~isempty(strfind(lower(obj.scorer.RBE_model{i}),'default'))
+                                obj.scorer.RBE_model{i} = 'mcn';
+                                fname = fullfile(obj.topasFolder,filesep,obj.scorerFolder,filesep,obj.infilenames.Scorer_RBE_MCN);
                             else
                                 matRad_cfg.dispError(['Model ',obj.scorer.RBE_model{i},' not implemented for ',obj.radiationMode]);
                             end

@@ -266,7 +266,7 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
 
             % bioDose
             % TODO: Improve isfield check by better model management
-            if this.calcBioDose && strcmp(this.bioParam.model,'LEM')
+            if this.calcBioDose && strcmp(this.bioModel,'LEM')
                 X.alpha = baseData.alpha;
                 X.beta = baseData.beta;
             end   
