@@ -105,6 +105,7 @@ parse(p, ct, varargin{:});
 % General properties
 lineFieldNames  = fieldnames(set(line));
 textFieldNames  = fieldnames(set(text));
+axesFieldNames  = fieldnames(set(axes));
 % Filter line properties from Unmatched
 unmParamNames   = fieldnames(p.Unmatched);
 lineFields      = unmParamNames(ismember(unmParamNames, lineFieldNames));
@@ -116,16 +117,23 @@ textFields      = unmParamNames(ismember(unmParamNames, textFieldNames));
 textValues      = struct2cell(p.Unmatched);
 textValues      = textValues(ismember(unmParamNames, textFieldNames));
 textVarargin    = reshape([textFields, textValues]', 1, []);
+% Filter Axes properties from Unmatched
+axesFields      = unmParamNames(ismember(unmParamNames, axesFieldNames));
+axesValues      = struct2cell(p.Unmatched);
+axesValues      = axesValues(ismember(unmParamNames, axesFieldNames));
+axesVarargin    = reshape([axesFields, axesValues]', 1, []);
 
 %% Plot ct slice
 matRad_cfg = MatRad_Config.instance();
 
 % Flip axes direction
+set(gca,'XTick',[],'YTick',[]);
 set(p.Results.axesHandle,'YDir','Reverse');
 % plot ct slice
 if p.Results.showCt
     hCt = matRad_plotCtSlice(p.Results.axesHandle,p.Results.ct.cubeHU,p.Results.cubeIdx,p.Results.plane,p.Results.slice, [], []);
 end
+axis(gca, 'off');
 hold on;
 
 %% Plot dose
@@ -205,6 +213,12 @@ end
 if ~isempty(textVarargin)
     set(p.Results.axesHandle, textVarargin{:})
     set(p.Results.axesHandle.Title, textVarargin{:})
+end
+
+if ~isempty(axesVarargin)
+    index = cellfun(@(x) strcmp(x,'Title'), axesVarargin, 'UniformOutput', 1);
+    index = find(index);
+    p.Results.axesHandle.Title.String = axesVarargin{index+1};
 end
 
 if ~exist('hCMap', 'var')

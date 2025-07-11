@@ -1458,7 +1458,10 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
                                 fname = fullfile(obj.topasFolder,filesep,obj.scorerFolder,filesep,obj.infilenames.Scorer_RBE_libamtrack);
                             elseif ~isempty(strfind(lower(obj.scorer.RBE_model{i}),'lem'))
                                 fname = fullfile(obj.topasFolder,filesep,obj.scorerFolder,filesep,obj.infilenames.Scorer_RBE_LEM1);
-                            else
+                            elseif ~isempty(strfind(lower(obj.scorer.RBE_model{i}),'default'))
+                                obj.scorer.RBE_model{i} = 'lem';
+                                fname = fullfile(obj.topasFolder,filesep,obj.scorerFolder,filesep,obj.infilenames.Scorer_RBE_LEM1);
+                            else    
                                 matRad_cfg.dispError(['Model ',obj.scorer.RBE_model{i},' not implemented for ',obj.radiationMode]);
                             end
                         otherwise
