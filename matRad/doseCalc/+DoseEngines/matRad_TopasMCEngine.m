@@ -38,6 +38,8 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
         clusterDoseIP           
         clusterDoseK 
         scoreTOPAS_RBE
+        includeElectrons = 0;
+        MCTSdatabase = 2021;
 
         topasExecCommand; %Defaults will be set during construction according to TOPAS installation instructions and used system
 
@@ -1306,6 +1308,22 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
                 fprintf(fID,'s:Sim/ScoreLabel = "score_%s_field%d_run%d"\n',obj.label,fieldIx,runIx);
             end
             fprintf(fID,'\n');
+            if obj.includeElectrons
+                fprintf(fID,'b:Sim/ElectronsBool = "True"\n');
+                fprintf(fID,'\n');
+            else
+                fprintf(fID,'b:Sim/ElectronsBool = "False"\n');
+                fprintf(fID,'\n');
+            end
+            if obj.MCTSdatabase == 2021
+                fprintf(fID,'s:Sim/MCTSvFolder = "/home/s742o/TOPASplans/MCTS-DataBase"\n');
+                fprintf(fID,'\n');
+            elseif obj.MCTSdatabase == 2024
+                fprintf(fID,'s:Sim/MCTSvFolder = "/home/s742o/MCTS-Database-v2024"\n');
+                fprintf(fID,'\n');
+            else
+                error('Select a proper MCTS database version!');
+            end
 
             logicalString = {'"False"', '"True"'};
 

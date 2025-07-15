@@ -278,6 +278,7 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
             conversionFactorCD = 10^6; 
             if this.calcClusterDose
                 % Identify primary particle in order to calculate lateral scattering
+                if isfield(bixel.baseData, 'Fluence')
                 if strcmp(this.machine.meta.radiationMode, 'carbon')
                     for idx = 1:length(bixel.baseData.Fluence.spectra)
                         if bixel.baseData.Fluence.spectra(idx).Z == 6
@@ -298,6 +299,7 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
                     end
                 else
                     error('primary particle not found \n');
+                end
                 end
 
                 if ~this.calcClusterDoseFromFluence
@@ -396,6 +398,9 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
                 end
             end
 
+            if strcmp(this.machine.meta.machine, 'HIT')
+                X.clusterDose = X.clusterDose';
+            end
             %X = structfun(@(v) matRad_interp1(depths,v,bixel.radDepths,'nearest'),X,'UniformOutput',false); %Extrapolate to zero?
             X = structfun(@(v) matRad_interp1(depths,v,bixel.radDepths(:),'linear'),X,'UniformOutput',false); %Extrapolate to zero?
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
