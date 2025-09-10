@@ -35,7 +35,7 @@ classdef matRad_HeliumMairani < matRad_RBEminMax
         function [RBEmin, RBEmax] = getRBEminMax(this,bixel)
 
 
-          f_QE      = (this.p1_HEL * bixel.LET.^2) .* exp(-this.p2_HEL * bixel.LET);
+          f_QE      = (this.p1_HEL .* bixel.LET.^2) .* exp(-this.p2_HEL .* bixel.LET);
           RBEmax_QE = 1 + ((this.p0_HEL  + (bixel.vABratio.^-1)) .* f_QE);
 
           % the linear quadratic fit yielded the best fitting result

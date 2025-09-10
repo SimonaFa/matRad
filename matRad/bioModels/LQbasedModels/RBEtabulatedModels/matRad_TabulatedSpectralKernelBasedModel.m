@@ -68,8 +68,18 @@ classdef matRad_TabulatedSpectralKernelBasedModel < matRad_LQRBETabulatedModel
 
             nFragments = numel(this.fragmentsToInclude);
 
+            % Convert fragments to Z
+            for i = 1:numel(this.fragmentsToInclude)
+                if strcmp(this.fragmentsToInclude{i}, 'H')
+                    includedZ(i) = 1;
+                else
+                    error('Not implemented')
+                end
+            end
+
             % collect the spectra from the bixel, for each fragment
-            spectraEnergies = cellfun(@(fragment) bixel.baseData.Spectra.(this.weightBy).(fragment).energies,this.fragmentsToInclude, 'UniformOutput',false);
+            %spectraEnergies = cellfun(@(fragment) bixel.baseData.Spectra.(this.weightBy).(fragment).energies,this.fragmentsToInclude, 'UniformOutput',false);
+            spectraEnergies = arrayfun(@(fragment) bixel.baseData.Fluence(fragment).energyBin,includedZ, 'UniformOutput',false);
             
             % Get the tissue classes within the bixel
             bixelTissueIndexes = unique(bixel.vTissueIndex)';

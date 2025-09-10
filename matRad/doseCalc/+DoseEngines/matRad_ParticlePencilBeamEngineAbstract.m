@@ -255,7 +255,11 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
 
             if ~isempty(this.bioKernelQuantities)
                 for i = 1:numel(this.bioKernelQuantities)
-                    X.(this.bioKernelQuantities{i}) = baseData.(this.bioKernelQuantities{i});
+                    if strcmp(this.bioKernelQuantities, 'spectra') && isfield(this.machine.data, 'Fluence')
+                        %X.(this.bioKernelQuantities{i}) = baseData.Fluence;
+                    else
+                        X.(this.bioKernelQuantities{i}) = baseData.(this.bioKernelQuantities{i});
+                    end
                 end
             end
             
@@ -398,33 +402,57 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
                 end
             end
 
-            if strcmp(this.machine.meta.machine, 'HIT')
+            if isfield(this.machine.meta, 'machine') && strcmp(this.machine.meta.machine, 'HIT')
                 X.clusterDose = X.clusterDose';
             end
             %X = structfun(@(v) matRad_interp1(depths,v,bixel.radDepths,'nearest'),X,'UniformOutput',false); %Extrapolate to zero?
             X = structfun(@(v) matRad_interp1(depths,v,bixel.radDepths(:),'linear'),X,'UniformOutput',false); %Extrapolate to zero?
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        if this.calcClusterDoseFromFluence
-            if isfield(baseData, 'Fluence')
-                if isfield(baseData.Fluence.spectra, 'tripleGauss')
-                    for partIdx = 1:numel(baseData.Fluence.spectra)
-                        % Calc single particle cluster Dose
-                        if isnan(baseData.Fluence.spectra(partIdx).A)
-                            tmpCD = matRad_calcTotalIPxFluenceInDepth( baseData, [this.clusterDoseIP num2str(this.clusterDoseK)], baseData.Fluence.spectra(partIdx).Z )';
-                        else
-                            tmpCD = matRad_calcTotalIPxFluenceInDepth( baseData, [this.clusterDoseIP num2str(this.clusterDoseK)], baseData.Fluence.spectra(partIdx).Z, baseData.Fluence.spectra(partIdx).A )';
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            if this.calcClusterDoseFromFluence
+                if isfield(baseData, 'Fluence')
+                    if isfield(baseData.Fluence.spectra, 'tripleGauss')
+                        for partIdx = 1:numel(baseData.Fluence.spectra)
+                            % Calc single particle cluster Dose
+                            if isnan(baseData.Fluence.spectra(partIdx).A)
+                                tmpCD = matRad_calcTotalIPxFluenceInDepth( baseData, [this.clusterDoseIP num2str(this.clusterDoseK)], baseData.Fluence.spectra(partIdx).Z )';
+                            else
+                                tmpCD = matRad_calcTotalIPxFluenceInDepth( baseData, [this.clusterDoseIP num2str(this.clusterDoseK)], baseData.Fluence.spectra(partIdx).Z, baseData.Fluence.spectra(partIdx).A )';
+                            end
+                            X.clusterDoseParticles(partIdx).clusterDoseProfile = conversionFactorCD.* matRad_interp1(depths, tmpCD, bixel.radDepths);
+                            X.Fluence(partIdx).sigma1 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.sigma1', bixel.radDepths);
+                            X.Fluence(partIdx).sigma2 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.sigma2', bixel.radDepths);
+                            X.Fluence(partIdx).sigma3 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.sigma3', bixel.radDepths);
+                            X.Fluence(partIdx).w2 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.w2', bixel.radDepths);
+                            X.Fluence(partIdx).w3 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.w3', bixel.radDepths);
+                            X.Fluence(partIdx).cumFluence = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).fluenceDepth', bixel.radDepths);
                         end
-                        X.clusterDoseParticles(partIdx).clusterDoseProfile = conversionFactorCD.* matRad_interp1(depths, tmpCD, bixel.radDepths);
-                        X.Fluence(partIdx).sigma1 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.sigma1', bixel.radDepths);
-                        X.Fluence(partIdx).sigma2 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.sigma2', bixel.radDepths);
-                        X.Fluence(partIdx).sigma3 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.sigma3', bixel.radDepths);
-                        X.Fluence(partIdx).w2 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.w2', bixel.radDepths);
-                        X.Fluence(partIdx).w3 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.w3', bixel.radDepths);
-                        X.Fluence(partIdx).cumFluence = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).fluenceDepth', bixel.radDepths);
                     end
                 end
             end
-        end
+
+            if ~isempty(this.bioKernelQuantities)
+                for i = 1:numel(this.bioKernelQuantities)
+                    if strcmp(this.bioKernelQuantities, 'spectra') && isfield(this.machine.data, 'Fluence')
+                        for partIdx = 1:numel(baseData.Fluence.spectra)
+                            % Interp single particle Fluence
+                            X.Fluence(partIdx).sigma1 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.sigma1', bixel.radDepths);
+                            X.Fluence(partIdx).sigma2 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.sigma2', bixel.radDepths);
+                            X.Fluence(partIdx).sigma3 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.sigma3', bixel.radDepths);
+                            X.Fluence(partIdx).w2 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.w2', bixel.radDepths);
+                            X.Fluence(partIdx).w3 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.w3', bixel.radDepths);
+                            X.Fluence(partIdx).cumFluence = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).fluenceDepth', bixel.radDepths);
+                            X.Fluence(partIdx).fluenceSpectrum = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).fluenceSpectrum', bixel.radDepths);
+                            X.Fluence(partIdx).Z = baseData.Fluence.spectra(partIdx).Z;
+                            X.Fluence(partIdx).A = baseData.Fluence.spectra(partIdx).A;
+                            if X.Fluence(partIdx).Z == -1
+                                X.Fluence(partIdx).energyBin = baseData.Fluence.energyBinEl;
+                            else
+                                X.Fluence(partIdx).energyBin = baseData.Fluence.energyBin;
+                            end
+                        end
+                    end
+                end
+            end
 
         end
 
@@ -911,6 +939,9 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
                         bixel.sigmaIniSq = largestSigmaSq4uniqueEnergies(cnt);
                         bixel.radDepths = (depthValues(j) + baseData.offset) * ones(size(radialDist_sq));
                         bixel.vTissueIndex = ones(size(bixel.radDepths));
+                        if length(bixel.radDepths)>1200
+                            stop = 1;
+                        end
                         bixel.vAlphaX      = 0.5*ones(size(bixel.radDepths));
                         bixel.vBetaX      = 0.05*ones(size(bixel.radDepths));
                         bixel.subRayIx = true(size(bixel.radDepths));
