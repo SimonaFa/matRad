@@ -1,0 +1,31 @@
+# Generic Tabulated RBE scorer
+
+s:Sc/tabulatedAlpha/Quantity                   = "RBE_TabulatedAlphaBeta"
+s:Sc/tabulatedAlpha/Component                  = "Patient"
+s:Sc/tabulatedAlpha/OutputQuantity             = "alpha"
+d:Sc/tabulatedAlpha/PrescribedDose             = Sc/PrescribedDose Gy
+sv:Sc/tabulatedAlpha/CellLines                 = Sc/CellLines
+s:Sc/tabulatedAlpha/OutputType                 = Sim/DoseScorerOutputType
+s:Sc/tabulatedAlpha/OutputFile                 = Sim/ScoreLabel + "_alpha_doseAveragedTabulatedAlphaBeta"
+s:Sc/tabulatedAlpha/IfOutputFileAlreadyExists  = "Overwrite"
+s:Sc/tabulatedAlpha/ModelName                  = "HCP"
+
+s:Sc/tabulatedBeta/Quantity                   = "RBE_TabulatedAlphaBeta"
+s:Sc/tabulatedBeta/Component                  = "Patient"
+s:Sc/tabulatedBeta/OutputQuantity             = "beta"
+d:Sc/tabulatedBeta/PrescribedDose             = Sc/PrescribedDose Gy
+sv:Sc/tabulatedBeta/CellLines                 = Sc/CellLines
+s:Sc/tabulatedBeta/OutputType                 = Sim/DoseScorerOutputType
+s:Sc/tabulatedBeta/OutputFile                 = Sim/ScoreLabel + "_beta_doseAveragedTabulatedAlphaBeta"
+s:Sc/tabulatedBeta/IfOutputFileAlreadyExists  = "Overwrite"
+s:Sc/tabulatedBeta/ModelName                  = "HCP"
+
+#s:Sc/RBE/Quantity                   = "RBE_TabulatedAlphaBeta"
+#s:Sc/RBE/Component                  = "Patient"
+#s:Sc/RBE/OutputQuantity             = "rbe"
+#d:Sc/RBE/PrescribedDose             = Sc/PrescribedDose Gy
+#sv:Sc/RBE/CellLines                 = Sc/CellLines
+#s:Sc/RBE/OutputType                 = Sim/DoseScorerOutputType
+#s:Sc/RBE/OutputFile                 = Sim/ScoreLabel + "_RBE_doseAveragedTabulatedAlphaBeta"
+#s:Sc/RBE/IfOutputFileAlreadyExists  = "Overwrite"
+#s:Sc/RBE/ModelName                  = "HCP"

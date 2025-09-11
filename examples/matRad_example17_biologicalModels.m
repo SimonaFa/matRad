@@ -4,8 +4,8 @@ matRad_cfg = MatRad_Config.instance();
 
 load('BOXPHANTOM.mat');
 
-pln.radiationMode   = 'protons';
-pln.machine         = 'Generic';
+pln.radiationMode   = 'carbon';
+pln.machine         = 'Generic_clusterDose_preStep_mod';
 pln.multScen        = 'nomScen';
 pln.numOfFractions  = 30;
 
@@ -40,9 +40,13 @@ stf = matRad_generateStf(ct,cst,pln);
 
 % We will compare the MCN model to constRBE.
 % We will plan with the the MCN model.
-pln.bioModel = matRad_MCNamara(); 
-%alternative: pln.bioModel = matRad_bioModel(pln.radiationMode,'MCN');
+%pln.bioModel = matRad_MCNamara(); 
+% pln.bioModel = matRad_bioModel(pln.radiationMode,'LEM');
 %altnerative: pln.bioModel = 'MCN';
+
+pln.bioModel = matRad_bioModel(pln.radiationMode,'TAB');
+pln.bioModel.RBEtableName = 'RBEtable_rapidLEMI_testTable';
+pln.bioModel.fragmentsToInclude = {'H1', 'C'};
 dij = matRad_calcDoseInfluence(ct,cst,stf,pln);
 
 %% Fluence optimization
