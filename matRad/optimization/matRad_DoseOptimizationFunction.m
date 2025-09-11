@@ -28,6 +28,7 @@ classdef (Abstract) matRad_DoseOptimizationFunction
     
     properties
         robustness = 'none';    %Robustness setting -> may be removed from the DoseObjective class in a future release
+        quantity;
     end
     
     methods

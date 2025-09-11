@@ -60,23 +60,37 @@ for  i = 1:size(cst,1)
          
          constraint = cst{i,6}{j};
          
+         % retrieve the robustness type
+         robustness = constraint.robustness;
+         
          % only perform computations for constraints
          if isa(constraint,'DoseConstraints.matRad_DoseConstraint')
-            
+            quantityConstrained = constraint.quantity;
+
+            quantityNames = cellfun(@(x) x.quantityName,optiProb.BP.quantities, 'UniformOutput',false);
+            quantityConstrainedInstance = optiProb.BP.quantities{strcmp(quantityConstrained,quantityNames)};
             % rescale dose parameters to biological optimization quantity if required
-            constraint = optiProb.BP.setBiologicalDosePrescriptions(constraint,cst{i,5}.alphaX,cst{i,5}.betaX);
-            
-            % retrieve the robustness type
-            robustness = constraint.robustness;
-            
+            constraint = quantityConstrainedInstance.setBiologicalDosePrescriptions(constraint,cst{i,5}.alphaX,cst{i,5}.betaX);
+
             switch robustness
-               case 'none' % if conventional opt: just sum objectives of nominal dose
-                   d_i = d{1}(cst{i,4}{1});
-                   c = [c; constraint.computeDoseConstraintFunction(d_i)];
+                case 'none' % if conventional opt: just sum objectives of nominal dose
+                  
+                  if isa(quantityConstrainedInstance, 'matRad_DistributionQuantity')
+                      d_i = d.(quantityConstrained){1}(cst{i,4}{1});
+                  elseif isa(quantityConstrainedInstance, 'matRad_ScalarQuantity')
+                      d_i = d.(quantityConstrained){i};
+                  end
+                  
+                  c = [c; constraint.computeDoseConstraintFunction(d_i)];
                   
                case 'PROB' % if prob opt: sum up expectation value of objectives
                   
-                  d_i = dExp{1}(cst{i,4}{1});
+                   if isa(quantityConstrainedInstance, 'matRad_DistributionQuantity')
+                      d_i = d.(quantityConstrained){1}(cst{i,4}{1});
+                  elseif isa(quantityConstrainedInstance, 'matRad_ScalarQuantity')
+                      d_i = d.(quantityConstrained){i};
+                  end
+
                   c = [c; constraint.computeDoseConstraintFunction(d_i)];
                   
                case 'VWWC'  % voxel-wise worst case - takes minimum dose in TARGET and maximum in OAR
@@ -134,6 +148,23 @@ for  i = 1:size(cst,1)
             end
             
             
+         elseif isa(constraint, 'OmegaConstraints.matRad_VarianceConstraint')
+
+            quantityConstrained = constraint.quantity;
+            quantityNames = cellfun(@(x) x.quantityName,optiProb.BP.quantities, 'UniformOutput',false);
+            quantityConstrainedInstance = optiProb.BP.quantities{strcmp(quantityConstrained,quantityNames)};
+            % rescale dose parameters to biological optimization quantity if required
+            constraint = quantityConstrainedInstance.setBiologicalDosePrescriptions(constraint,cst{i,5}.alphaX,cst{i,5}.betaX);
+            
+            switch robustness
+
+                case 'PROB'
+                    allVoxels = arrayfun(@(scenStruct) scenStruct{1}, cst{i,4}, 'UniformOutput',false);
+                    nVoxels = numel(unique([allVoxels{:}]));
+                    d_i = d.(quantityConstrained){i};
+                    c = [c; constraint.computeVarianceConstraintFunction(d_i, nVoxels)];
+            end
+           
          end
          
       end % if we are a constraint
@@ -141,5 +172,6 @@ for  i = 1:size(cst,1)
    end % over all defined constraints & objectives
    
 end % if structure not empty and oar or target
+
 
 end % over all structures

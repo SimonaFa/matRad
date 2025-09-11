@@ -1,4 +1,4 @@
-function resultGUI = matRad_calcCubes(w,dij,scenNum)
+function resultGUI = matRad_calcCubes(w,dij,scenNum,boolInterpolate)
 % matRad computation of all cubes for the resultGUI struct
 % which is used as result container and for visualization in matRad's GUI
 %
@@ -32,8 +32,12 @@ function resultGUI = matRad_calcCubes(w,dij,scenNum)
 
 matRad_cfg = MatRad_Config.instance();
 
-if nargin < 3
+if  ~exist('scenNum', 'var') || isempty(scenNum)
     scenNum = 1;
+end
+
+if ~exist('boolInterpolate', 'var') || isempty(boolInterpolate)
+    boolInterpolate = true;
 end
 
 resultGUI.w = w;
@@ -98,11 +102,17 @@ end
 
 %% RBE weighted dose
 % consider RBE for protons and skip varRBE calculation
-if isfield(dij,'RBE') && isscalar(dij.RBE)
+if isfield(dij,'RBE') && isscalar(dij.RBE) && ~ any(cellfun(@(teststr) ~isempty(strfind(lower(teststr),'alpha')), fieldnames(dij)))
     for i = 1:length(beamInfo)
         resultGUI.(['RBExDose', beamInfo(i).suffix]) = resultGUI.(['physicalDose', beamInfo(i).suffix]) * dij.RBE;
     end
 elseif any(cellfun(@(teststr) ~isempty(strfind(lower(teststr),'alpha')), fieldnames(dij)))
+
+    if isfield(dij,'RBE') && isscalar(dij.RBE)
+        for i = 1:length(beamInfo)
+            resultGUI.(['constRBExD', beamInfo(i).suffix]) = resultGUI.(['physicalDose', beamInfo(i).suffix]) * dij.RBE;
+        end
+    end
     % Load RBE models if MonteCarlo was calculated for multiple models
     if isfield(dij,'RBE_model')
         RBE_model = cell(1,length(dij.RBE_model));
@@ -253,20 +263,21 @@ end
 resultGUI = orderfields(resultGUI);
 
 % interpolation if dose grid does not match ct grid
-if isfield(dij,'ctGrid') && any(dij.ctGrid.dimensions~=dij.doseGrid.dimensions)
-    myFields = fieldnames(resultGUI);
-    for i = 1:numel(myFields)
-        if numel(resultGUI.(myFields{i})) == dij.doseGrid.numOfVoxels
-
-            % interpolate!
-            resultGUI.(myFields{i}) = matRad_interp3(dij.doseGrid.x,dij.doseGrid.y',dij.doseGrid.z, ...
-                resultGUI.(myFields{i}), ...
-                dij.ctGrid.x,dij.ctGrid.y',dij.ctGrid.z,'linear',0);
-
+if boolInterpolate
+    if isfield(dij,'ctGrid') && any(dij.ctGrid.dimensions~=dij.doseGrid.dimensions)
+        myFields = fieldnames(resultGUI);
+        for i = 1:numel(myFields)
+            if numel(resultGUI.(myFields{i})) == dij.doseGrid.numOfVoxels
+    
+                % interpolate!
+                resultGUI.(myFields{i}) = matRad_interp3(dij.doseGrid.x,dij.doseGrid.y',dij.doseGrid.z, ...
+                    resultGUI.(myFields{i}), ...
+                    dij.ctGrid.x,dij.ctGrid.y',dij.ctGrid.z,'linear',0);
+    
+            end
         end
     end
 end
-
 
 end
 

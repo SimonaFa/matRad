@@ -32,13 +32,11 @@ function jacobStruct = matRad_getJacobianStructure(optiProb,w,dij,cst)
 %	
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%	
  % Initializes constraints	
-jacobStruct = sparse([]);
-
-tmp = false(size(dij.physicalDose{1},1),1);
+jacobStruct = sparse([]);	
  % compute objective function for every VOI.	
 for i = 1:size(cst,1)	
      % Only take OAR or target VOI.	
-    if ~any(cellfun(@isempty,cst{i,4})) && any(strcmp(cst{i,3},{'OAR','TARGET','EXTERNAL'}))
+    if ~any(cellfun(@isempty,cst{i,4})) && ( isequal(cst{i,3},'OAR') || isequal(cst{i,3},'TARGET') )	
          % loop over the number of constraints for the current VOI	
         for j = 1:numel(cst{i,6})	
             	
@@ -46,16 +44,26 @@ for i = 1:size(cst,1)
             	
             % only perform computations for constraints	
               if isa(obj,'DoseConstraints.matRad_DoseConstraint')
-              	tmp(:) = false;
-                tmp(cst{i,4}{1}) = true;
                 	
                 % get the jacobian structure depending on dose	
                 jacobDoseStruct = obj.getDoseConstraintJacobianStructure(numel(cst{i,4}{1}));	
-                nRows = size(jacobDoseStruct,2);	
-                %jacobStruct = [jacobStruct; repmat(spones(mean(dij.physicalDose{1}(cst{i,4}{1},:),1)),nRows,1)];	
-                jacobStruct = [jacobStruct; repmat(spones(double(tmp') * dij.physicalDose{1}),nRows,1)];
-                 
-             end	
-         end	
+                nRows = size(jacobDoseStruct,2);
+                if isfield(dij, 'physicalDose') && ~isempty(dij.physicalDose{1})
+                    jacobStruct = [jacobStruct; repmat(spones(mean(dij.physicalDose{1}(cst{i,4}{1},:),1)),nRows,1)];	
+                else
+                    jacobStruct = [jacobStruct; repmat(spones(mean(dij.physicalDoseExp{1}(cst{i,4}{1},:),1)),nRows,1)];	
+                end
+
+              elseif isa(obj, 'OmegaConstraints.matRad_VarianceConstraint')
+                jacobDoseStruct = obj.getVarianceConstraintJacobianStructure(numel(cst{i,4}{1}));	
+                nRows = size(jacobDoseStruct,2);
+                if isfield(dij, 'physicalDose') && ~isempty(dij.physicalDose{1})
+                    jacobStruct = [jacobStruct; repmat(spones(mean(dij.physicalDose{1}(cst{i,4}{1},:),1)),nRows,1)];	
+                else
+                    jacobStruct = [jacobStruct; repmat(spones(mean(dij.physicalDoseExp{1}(cst{i,4}{1},:),1)),nRows,1)];	
+                end
+              end
+
+        end	
      end	
  end

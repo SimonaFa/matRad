@@ -34,6 +34,8 @@ function [resultGUI,optimizer] = matRad_fluenceOptimization(dij,cst,pln,wInit)
 
 matRad_cfg = MatRad_Config.instance();
 
+%{
+<<<<<<< HEAD
 % consider VOI priorities
 cst  = matRad_setOverlapPriorities(cst);
 
@@ -220,102 +222,15 @@ end
 % calculate initial beam intensities wInit
 matRad_cfg.dispInfo('Estimating initial weights... ');
 
+=======
+>>>>>>> dev_quantities_RBE_tabModels_copyRemo
+%}
 if exist('wInit','var')
-    %do nothing as wInit was passed to the function
-    matRad_cfg.dispInfo('chosen provided wInit!\n');
-
-    % Write ixDose which is needed for the optimizer
-    if isa(backProjection, 'matRad_EffectProjection')
-        dij.ixDose  = dij.bx~=0;
-
-        %pre-calculations
-        dij.gamma             = zeros(dij.doseGrid.numOfVoxels,dij.numOfScenarios);
-        dij.gamma(dij.ixDose) = dij.ax(dij.ixDose)./(2*dij.bx(dij.ixDose));
-    end
-
-elseif isa(backProjection, 'matRad_ConstantRBEProjection') && strcmp(pln.radiationMode,'protons')
-    % check if a constant RBE is defined - if not use 1.1
-    if ~isfield(dij,'RBE')
-        dij.RBE = 1.1;
-    end
-
-    doseTmp = dij.physicalDose{1}*wOnes;
-    bixelWeight =  (doseTarget)/(dij.RBE * mean(doseTmp(V)));
-    wInit       = wOnes * bixelWeight;
-    matRad_cfg.dispInfo('chosen uniform weight of %f!\n',bixelWeight);
-
-elseif isa(backProjection, 'matRad_EffectProjection')
-    % retrieve photon LQM parameter
-    [ax,bx] = matRad_getPhotonLQMParameters(cst,dij.doseGrid.numOfVoxels);
-    checkAxBx = cellfun(@(ax1,bx1,ax2,bx2) isequal(ax1(ax1~=0),ax2(ax1~=0)) && isequal(bx1(bx1~=0),bx2(bx1~=0)),dij.ax,dij.bx,ax,bx);
-    if ~all(checkAxBx)
-        matRad_cfg.dispError('Inconsistent biological parameters in dij.ax and/or dij.bx - please recalculate dose influence matrix before optimization!\n');
-    end
-
-    for i = 1:size(cst,1)
-
-        for j = 1:size(cst{i,6},2)
-            % check if prescribed doses are in a valid domain
-            if any(cst{i,6}{j}.getDoseParameters() > 5) && isequal(cst{i,3},'TARGET')
-                matRad_cfg.dispError('Reference dose > 5 Gy[RBE] for target. Biological optimization outside the valid domain of the base data. Reduce dose prescription or use more fractions.\n');
-            end
-
-        end
-    end
-
-    for s = 1:numel(dij.bx)
-        dij.ixDose{s}  = dij.bx{s}~=0;
-    end
-    
-    doseTmp = dij.physicalDose{1}*wOnes;
-    if all(isfield(dij,{'mAlphaDose','mSqrtBetaDose'}))
-        aTmp = dij.mAlphaDose{1}*wOnes;
-        bTmp = dij.mSqrtBetaDose{1} * wOnes;
-    else        
-        aTmp = doseTmp.*dij.ax{1};
-        bTmp = doseTmp.*sqrt(dij.bx{1});
-    end
-
-    if isequal(pln.propOpt.quantityOpt,'effect')
-
-        effectTarget = cst{ixTarget,5}.alphaX * doseTarget + cst{ixTarget,5}.betaX * doseTarget^2;
-        p = sum(aTmp(V)) / sum(bTmp(V).^2);
-        q = -(effectTarget * length(V)) / sum(bTmp(V).^2);
-
-        wInit        = -(p/2) + sqrt((p^2)/4 -q) * wOnes;
-
-    elseif isequal(pln.propOpt.quantityOpt,'RBExDose')
-
-        %pre-calculations
-        for s = 1:numel(dij.ixDose)
-            dij.gamma{s}             = zeros(dij.doseGrid.numOfVoxels,dij.numOfScenarios);
-            dij.gamma{s}(dij.ixDose{s}) = dij.ax{s}(dij.ixDose{s})./(2*dij.bx{s}(dij.ixDose{s}));
-        end
-
-
-        % calculate current effect in target
-        CurrEffectTarget = aTmp(V) + bTmp(V).^2;
-        % ensure a underestimated biological effective dose
-        TolEstBio        = 1.2;
-        % calculate maximal RBE in target
-        maxCurrRBE = max(-cst{ixTarget,5}.alphaX + sqrt(cst{ixTarget,5}.alphaX^2 + ...
-            4*cst{ixTarget,5}.betaX.*CurrEffectTarget)./(2*cst{ixTarget,5}.betaX*doseTmp(V)));
-        wInit    =  ((doseTarget)/(TolEstBio*maxCurrRBE*max(doseTmp(V))))* wOnes;
-
-    elseif strcmp(pln.propOpt.quantityOpt, 'BED')
-        abr = cst{ixTarget,5}.alphaX./cst{ixTarget,5}.betaX;
-        meanBED = mean((aTmp(V) + bTmp(V).^2)./cst{ixTarget,5}.alphaX);
-
-        BEDTarget = doseTarget.*(1 + doseTarget./abr);
-
-        bixelWeight =  BEDTarget/meanBED;
-        wInit       = wOnes * bixelWeight;
-
-    end
-
-    matRad_cfg.dispInfo('chosen weights adapted to biological dose calculation!\n');
-
+    [dij,cst,pln,wInit,optiProb,FLAG_ROB_OPT] = matRad_initOptimization(dij,cst,pln,wInit);
 else
+
+%{
+<<<<<<< HEAD
     
     if isfield(dij, 'mClusterDose')
         if ~isempty(dij.mClusterDose)
@@ -412,6 +327,16 @@ if pln.propOpt.boundMU
     end
 else
     matRad_cfg.dispInfo('Using standard MU bounds of [0,Inf]!\n')
+=======
+%}
+    [dij,cst,pln,wInit,optiProb,FLAG_ROB_OPT] = matRad_initOptimization(dij,cst,pln);
+end
+
+%Dummy
+tmpConstRBExDCheck = cellfun(@(quantity) isa(quantity,'matRad_ConstantRBExDose'), optiProb.BP.quantities, 'UniformOutput',false);
+if any([tmpConstRBExDCheck{:}]) && ~isfield(dij,'RBE')
+    dij.RBE = 1.1;
+%>>>>>>> dev_quantities_RBE_tabModels_copyRemo
 end
 
 if ~isfield(pln.propOpt,'optimizer')
@@ -421,7 +346,7 @@ if ~isfield(pln.propOpt,'optimizer')
         pln.propOpt.optimizer = 'fmincon';
     else
         pln.propOpt.optimizer = 'IPOPT';
-    end    
+    end   
 end
 
 
@@ -436,7 +361,7 @@ switch pln.propOpt.optimizer
         warning(['Optimizer ''' pln.propOpt.optimizer ''' not known! Fallback to IPOPT!']);
         optimizer = matRad_OptimizerIPOPT;
 end
-
+        
 if ~optimizer.IsAvailable()
     matRad_cfg.dispError(['Optimizer ''' pln.propOpt.optimizer ''' not available!']);
 end
@@ -447,19 +372,35 @@ optimizer = optimizer.optimize(wInit,optiProb,dij,cst);
 wOpt = optimizer.wResult;
 info = optimizer.resultInfo;
 
-resultGUI = matRad_calcCubes(wOpt,dij);
+try
+    resultGUI = matRad_calcCubes(wOpt,dij);
+catch
+    matRad_cfg.dispWarning('Unable to compue calcCubes');
+end
 resultGUI.wUnsequenced = wOpt;
 resultGUI.usedOptimizer = optimizer;
 resultGUI.info = info;
+resultGUI.info.timePerIteration = resultGUI.info.cpu/resultGUI.info.iter;
 
-%Robust quantities
-if pln.multScen.totNumScen > 1
-    for i = 1:pln.multScen.totNumScen
-        scenSubIx = pln.multScen.linearMask(i,:);
-        resultGUItmp = matRad_calcCubes(wOpt,dij,pln.multScen.sub2scenIx(scenSubIx(1),scenSubIx(2),scenSubIx(3)));
-        resultGUI = matRad_appendResultGUI(resultGUI,resultGUItmp,false,sprintf('scen%d',i));
-    end
+if ~exist('computeScenarios', 'var') || isempty(computeScenarios)
+    computeScenarios = 1;
 end
 
+%Robust quantities
+try
+    if computeScenarios
+        if FLAG_ROB_OPT
+            if pln.multScen.totNumScen > 1
+                for i = 1:pln.multScen.totNumScen
+                    scenSubIx = pln.multScen.linearMask(i,:);
+                    resultGUItmp = matRad_calcCubes(wOpt,dij,pln.multScen.sub2scenIx(scenSubIx(1),scenSubIx(2),scenSubIx(3)));
+                    resultGUI = matRad_appendResultGUI(resultGUI,resultGUItmp,false,sprintf('scen%d',i));
+                end
+            end
+        end
+    end
+catch
+    matRad_cfg.dispWarning('Unable to compute calcCubes');
+end
 % unblock mex files
 clear mex

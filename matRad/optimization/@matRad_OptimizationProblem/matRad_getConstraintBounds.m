@@ -29,7 +29,7 @@ function [cl,cu] = matRad_getConstraintBounds(optiProb,cst)
 
 
 BPtype = class(optiProb.BP);
-isEffectBP = strcmp(BPtype,'matRad_EffectProjection');
+%isEffectBP = strcmp(BPtype,'matRad_EffectProjection');
 
 % Initialize bounds
 cl = [];
@@ -44,7 +44,7 @@ for  i = 1:size(cst,1)
         % loop over the number of constraints for the current VOI
         for j = 1:numel(cst{i,6})
             
-            optiFunc = cst{i,6}{j};
+            constraint = cst{i,6}{j};
             
             % only perform computations for constraints
 %{
@@ -63,18 +63,24 @@ for  i = 1:size(cst,1)
                     [clTmp,cuTmp] = matRad_getConstBounds(cst{i,6}(j),param);
 %}
             %if ~isempty(strfind(cst{i,6}{j}.type,'constraint'))
-            if isa(optiFunc,'DoseConstraints.matRad_DoseConstraint')
+            
+            if isa(constraint,'DoseConstraints.matRad_DoseConstraint') || isa(constraint, 'OmegaConstraints.matRad_VarianceConstraint')
                 
-                if isEffectBP
+                %if isEffectBP
                    
-                    doses  = optiFunc.getDoseParameters();
-                    effect = cst{i,5}.alphaX*doses + cst{i,5}.betaX*doses.^2;
+                %    doses  = optiFunc.getDoseParameters();
+                %    effect = cst{i,5}.alphaX*doses + cst{i,5}.betaX*doses.^2;
                     
-                    optiFunc = optiFunc.setDoseParameters(effect);
-                end
-                   
-                 cl = [cl;optiFunc.lowerBounds(numel(cst{i,4}{1}))];
-                 cu = [cu;optiFunc.upperBounds(numel(cst{i,4}{1}))];
+                %    optiFunc = optiFunc.setDoseParameters(effect);
+                %end
+                quantityConstrained = constraint.quantity;
+                quantityNames = cellfun(@(x) x.quantityName,optiProb.BP.quantities, 'UniformOutput',false);
+                quantityConstrainedInstance = optiProb.BP.quantities{strcmp(quantityConstrained,quantityNames)};
+
+                constraint = quantityConstrainedInstance.setBiologicalDosePrescriptions(constraint,cst{i,5}.alphaX,cst{i,5}.betaX);
+  
+                 cl = [cl;constraint.lowerBounds(numel(cst{i,4}{1}))];
+                 cu = [cu;constraint.upperBounds(numel(cst{i,4}{1}))];
                     
                 %end
             end

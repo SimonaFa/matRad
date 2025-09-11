@@ -52,10 +52,8 @@ if nargin < 4
     extrapolation = NaN;
 end
 
-
-
 % manual interpolation for only one query point to save time
-if numel(x) == 1
+if numel(x) == 1 % When C is used the extrapolation is NaN
 
     ix1 = find((x >= xi), 1, 'last');
     ix2 = find((x <= xi), 1, 'first');
@@ -100,18 +98,17 @@ elseif isGriddedInterpolantAvailable
         queryPoints  = {x,  1:size(yi,2)};
     else
 		% interpolation for a single 1-D dataset
-        samplePoints = {xi};
+        samplePoints = {xi}; % if extrapolation is NaN, the double vector is transposed
         queryPoints  = {x};
     end
 
-    F = griddedInterpolant(samplePoints,yi,'linear',extrapmethod);
+    F = griddedInterpolant(samplePoints,yi,'linear',extrapmethod); 
 
     y = F(queryPoints);
 
     if isnumeric(extrapolation) && ~isnan(extrapolation)
         y(isnan(y)) = extrapolation;
     end
-
 
 else
     % for older matlab versions or octave use this code

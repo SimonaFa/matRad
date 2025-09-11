@@ -244,7 +244,7 @@ classdef (Abstract) matRad_DoseEngineBase < handle
             end
         end
         
-        function resultGUI = calcDoseForward(this,ct,cst,stf,w)
+        function resultGUI = calcDoseForward(this,ct,cst,stf,w) % here we can add the value for alphaX
             matRad_cfg = MatRad_Config.instance();
             if nargin < 5 && ~isfield([stf.ray],'weight')
                 matRad_cfg.dispError('No weight vector available. Please provide w or add info to stf')
@@ -280,7 +280,7 @@ classdef (Abstract) matRad_DoseEngineBase < handle
             %Set direct dose calculation and compute "dij"
             this.directWeights = w;
             this.calcDoseDirect = true;
-            dij = this.calcDose(ct,cst,stf);
+            dij = this.calcDose(ct,cst,stf); % here we can add value: alphaX = 0.1
 
             % calculate cubes; use uniform weights here, weighting with actual fluence 
             % already performed in dij construction

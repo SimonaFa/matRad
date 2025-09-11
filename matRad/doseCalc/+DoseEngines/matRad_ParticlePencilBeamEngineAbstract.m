@@ -220,6 +220,7 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
         end
 
         function X = interpolateKernelsInDepth(this,bixel)
+            
             baseData = bixel.baseData;
             
             depths = baseData.depths;
@@ -253,6 +254,8 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
                     matRad_cfg.dispError('Invalid Lateral Model');
             end
 
+%{
+<<<<<<< HEAD
             if ~isempty(this.bioKernelQuantities)
                 for i = 1:numel(this.bioKernelQuantities)
                     if strcmp(this.bioKernelQuantities, 'spectra') && isfield(this.machine.data, 'Fluence')
@@ -263,11 +266,16 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
                 end
             end
             
+=======
+          
+>>>>>>> dev_quantities_RBE_tabModels_copyRemo
+%}
             % LET
             if this.calcLET
                 X.LET = baseData.LET;
             end
-
+%{
+<<<<<<< HEAD
             % bioDose
             % TODO: Improve isfield check by better model management
             if this.calcBioDose && strcmp(this.bioModel,'LEM')
@@ -460,6 +468,26 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
             gaussDist = @(r, s) exp( -r.^2 ./ (2*s.^2)) ./ (2*pi*s.^2);
             gaussDist3 = @(r, s1, s2, s3, w2, w3) (1 - w2 - w3) .* gaussDist(r, s1) + w2 .* gaussDist(r, s2) + w3 .* gaussDist(r, s3); 
             dist3 = gaussDist3(radialDist, sigma1, sigma2, sigma3, weight2, weight3);
+=======
+%}
+            
+            X = structfun(@(v) matRad_interp1(depths,v,bixel.radDepths(:),'nearest'),X,'UniformOutput',false); %Extrapolate to zero?
+
+            if ~isempty(this.bioKernelQuantities)
+                for i = 1:numel(this.bioKernelQuantities)
+                    tmpKernel = eval(sprintf('baseData.%s', this.bioKernelQuantities{i}));
+                    if size(tmpKernel,1) ~= numel(depths)
+                        if size(tmpKernel,2) == numel(depths) % If transposed, transpose back
+                            tmpKernel = tmpKernel';
+                        else
+                            matRad_cfg =  MatRad_Config.instance();
+                            matRad_cfg.dispError(sprintf('Incorrect size for kernel: %s to be interpolated', this.bioKernelQuantities{1}));
+                        end
+                    end
+                    eval(sprintf('X.%s = matRad_interp1(depths,tmpKernel,bixel.radDepths(:),''nearest'');', this.bioKernelQuantities{i}));
+                end
+            end
+%>>>>>>> dev_quantities_RBE_tabModels_copyRemo
         end
 
         % We override this function to boost efficiency a bit (latDistX & Z
@@ -677,8 +705,24 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
                 this.vTissueIndex{s}    = zeros(size(tmpScenVdoseGrid{s},1),1);
             end
            
-            if isa(this.bioModel,'matRad_LQKernelBasedModel') || isa(this.bioModel,'matRad_LQRBETabulatedModel')
+            if isa(this.bioModel,'matRad_LQKernelBasedModel')
                 this.bioKernelQuantities = this.bioModel.kernelQuantities;
+                [this.vTissueIndex] = this.bioModel.getTissueInformation(this.machine,this.cstDoseGrid,dij,this.vAlphaX, this.vBetaX,this.VdoseGrid, this.VdoseGridScenIx);
+            % elseif isa(this.bioModel,'matRad_LQRBETabulatedModel')
+            %     baseDataFragmentIndexes  = this.bioModel.selectBaseDataFragmentsFromMachine(this.machine);
+            %     this.bioKernelQuantities = this.bioModel.getBaseDataKernels(baseDataFragmentIndexes);
+            %     [this.vTissueIndex] = this.bioModel.getTissueInformation(this.machine,this.cstDoseGrid,dij,this.vAlphaX, this.vBetaX,this.VdoseGrid, this.VdoseGridScenIx);
+            % 
+            %     % This is only temporary
+            %     firstEnergies = arrayfun(@(data)data.(this.bioModel.weightBy).energyBin(1), this.machine.data);
+            % 
+            %     if any(firstEnergies == 0)
+            %         matRad_cfg.dispWarning('One or more energies in the spectral kernel data have data points for energy = 0. Energy bins will be shifted to match the bin center value.');
+            %     end
+
+            elseif isa(this.bioModel,'matRad_TabulatedQuantityModel')
+                this.bioKernelQuantities = this.bioModel.quantitiesToAverage;
+                this.machine = this.bioModel.computeKernels(this.machine);
                 [this.vTissueIndex] = this.bioModel.getTissueInformation(this.machine,this.cstDoseGrid,dij,this.vAlphaX, this.vBetaX,this.VdoseGrid, this.VdoseGridScenIx);
             end
 
