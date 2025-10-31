@@ -2,6 +2,8 @@ classdef matRad_TabulatedQuantityModel < matRad_LQBasedModel
 
     properties
         includedFragments;
+
+
     end
 
     methods
@@ -105,9 +107,16 @@ classdef matRad_TabulatedQuantityModel < matRad_LQBasedModel
 
             availableFragments = [availableZ, availableA];
             
-            indexes = ismember(availableFragments,[Z',A'], 'rows');
+            %indexes = ismember(availableFragments,[Z',A'], 'rows');
 
-            outData = structArray(indexes);
+            %outData = structArray(indexes);
+
+            for fragIdx = 1:length(Z)
+                if any(ismember(availableFragments, [Z(fragIdx), A(fragIdx)], 'rows'))
+                    structIdx = ismember(availableFragments, [Z(fragIdx), A(fragIdx)], 'rows');
+                    outData(fragIdx) = structArray(structIdx);
+                end
+            end
             
         end
     end

@@ -82,7 +82,7 @@ for j = 1:length(doseFields)
 end
 
 if ~isfield(dij,'doseWeightingThreshold')
-    dij.doseWeightingThreshold = 0.01;
+    dij.doseWeightingThreshold = 1e-5;%0.01;
 end
 absoluteDoseWeightingThreshold = dij.doseWeightingThreshold*max(resultGUI.physicalDose(:));
 
@@ -257,6 +257,42 @@ if isfield(dij, 'mClusterDoseSecondary')
         resultGUI.(['clusterDose_secondary', beamInfo(i).suffix]) = reshape(full(clusterDoseCubeSecondary),dij.doseGrid.dimensions);
     end
 end
+
+%% Fluence
+
+if isfield(dij,'mFluence')
+    for i = 1:length(beamInfo)
+        fluenceCube = dij.mFluence{scenNum} * (resultGUI.w .* beamInfo(i).logIx);
+        resultGUI.(['fluence', beamInfo(i).suffix]) = zeros(dij.doseGrid.dimensions);
+        resultGUI.(['fluence', beamInfo(i).suffix]) = fluenceCube;
+        resultGUI.(['fluence', beamInfo(i).suffix]) = reshape(full(fluenceCube),dij.doseGrid.dimensions);
+        if isfield(dij,'mFluence_Std')
+            fluenceStdCube = dij.mFluence_Std;
+            resultGUI.(['fluence', '_batchStd', beamInfo(i).suffix]) = sqrt(reshape(full(fluenceStdCube{scenNum}.^2 * (resultGUI.w .* beamInfo(i).logIx)),dij.doseGrid.dimensions));
+            %resultGUI.([doseFields{j}, doseQuantities{k}, beamInfo(i).suffix])(isnan(resultGUI.([doseFields{j}, doseQuantities{k}, beamInfo(i).suffix]))) = 0;
+        end
+    end
+end
+
+%% Averaged Ip
+
+if isfield(dij,'mFluence') && isfield(dij, 'mClusterDose')
+    for i = 1:length(beamInfo)
+        clusterDoseCube = dij.mClusterDose{scenNum} * (resultGUI.w .* beamInfo(i).logIx);
+        fluenceCube = dij.mFluence{scenNum} * (resultGUI.w .* beamInfo(i).logIx);
+        averageIpCube = clusterDoseCube./fluenceCube;
+        averageIpCube(isnan(averageIpCube(:))) = 0;
+        resultGUI.(['averageIp', beamInfo(i).suffix]) = zeros(dij.doseGrid.dimensions);
+        resultGUI.(['averageIp', beamInfo(i).suffix]) = averageIpCube;
+        resultGUI.(['averageIp', beamInfo(i).suffix]) = reshape(full(averageIpCube),dij.doseGrid.dimensions);
+        if isfield(dij,'mAverageIp_Std')
+            averageIpStdCube = dij.mAverageIp_Std;
+            resultGUI.(['averageIp', '_batchStd', beamInfo(i).suffix]) = sqrt(reshape(full(averageIpStdCube{scenNum}.^2 * (resultGUI.w .* beamInfo(i).logIx)),dij.doseGrid.dimensions));
+            %resultGUI.([doseFields{j}, doseQuantities{k}, beamInfo(i).suffix])(isnan(resultGUI.([doseFields{j}, doseQuantities{k}, beamInfo(i).suffix]))) = 0;
+        end
+    end
+end
+
 
 %%
 % group similar fields together

@@ -239,11 +239,20 @@ classdef matRad_BackProjection < handle
                 % initialization
                 primaryQuantities = {'physicalDose', 'constantRBExDose','effect','RBExDose','BED'};
 
-                targetQtForInitilaization = intersect(allTargetQuantities, primaryQuantities);
+                %targetQtForInitilaization = intersect(allTargetQuantities, primaryQuantities);
+
+                if ~isempty(allTargetQuantities{1}) && ~isempty(primaryQuantities{1})
+                    targetQtForInitilaization = intersect(allTargetQuantities, primaryQuantities);
+                else
+                    targetQtForInitilaization = [];
+                end
                 
                 if isempty(targetQtForInitilaization)
                     % If none of the primary quantities is set, just take the first one
                     targetQtForInitilaization = allTargetQuantities(1);
+                    if isempty(targetQtForInitilaization{:})
+                        targetQtForInitilaization = {primaryQuantities{1}};
+                    end
                 %else
                     % Just want to simplify it down and select one
                     % quantity, just take the one with the highest

@@ -3,6 +3,11 @@ classdef (Abstract) matRad_TabulatedDoseAveragedKernelModel < matRad_TabulatedQu
     properties (Abstract, Constant)
         quantitiesToAverage;
     end
+    properties
+        ionsName = {'H1', 'He', 'Li', 'Be', 'B', 'C'};
+        defaultZ    = [1, 2, 3, 4, 5, 6];
+        defaultA   = [1, 4, 7, 9, 11, 12];
+    end
 
     properties
         stoppingPowerTable;
@@ -107,9 +112,28 @@ classdef (Abstract) matRad_TabulatedDoseAveragedKernelModel < matRad_TabulatedQu
             
              if isempty(this.quantityTable)
                 this.quantityTable = this.loadTable(this.quantityTableName);
-            end
+             end
 
-            table = this.extractFragmentsWithZA([fragments.Z], [fragments.A], this.quantityTable.data);
+             if ~isfield(this.quantityTable.data, 'Z') || ~isfield(this.quantityTable.data, 'A') && isfield(this.quantityTable.data, 'includedIons')
+                included = this.quantityTable.data(1).includedIons;
+                tmpZ = arrayfun(@(ion) this.defaultZ(strcmp(ion{1}, this.ionsName)), included);
+                tmpA = arrayfun(@(ion) this.defaultA(strcmp(ion{1}, this.ionsName)), included);
+                [this.quantityTable.data.Z] = deal(tmpZ);
+                [this.quantityTable.data.A] = deal(tmpA);
+             end
+
+             tmpZ = [fragments.Z];
+             tmpA = [fragments.A];
+
+             if any([fragments.Z] == 1 & [fragments.A] ~= 1)
+                 [tmpA([fragments.Z] == 1)] = deal(1);
+             end
+
+             table = this.extractFragmentsWithZA([tmpZ], [tmpA], this.quantityTable.data);
+
+             if sum(([table.Z]==1))>1
+                 [table.A] = deal(fragments.A);
+             end
 
         end
 
@@ -119,7 +143,18 @@ classdef (Abstract) matRad_TabulatedDoseAveragedKernelModel < matRad_TabulatedQu
                 this.stoppingPowerTable = this.loadStoppingPowerTable(this.stoppingPowerTableName);
             end
 
-            spTable = this.extractFragmentsWithZA([fragments.Z], [fragments.A], this.stoppingPowerTable.data);
+            tmpZ = [fragments.Z];
+            tmpA = [fragments.A];
+
+            if any([fragments.Z] == 1 & [fragments.A] ~= 1)
+                [tmpA([fragments.Z] == 1)] = deal(1);
+            end
+
+            spTable = this.extractFragmentsWithZA(tmpZ, tmpA, this.stoppingPowerTable.data);
+
+            if sum(([spTable.Z]==1))>1
+               [spTable.A] = deal(fragments.A);
+            end
 
             % TODO: Check that all fragments got out
             if numel(spTable) ~= numel(fragments)

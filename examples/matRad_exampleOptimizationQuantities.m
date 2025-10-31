@@ -58,7 +58,7 @@ dij = matRad_calcDoseInfluence(ct,cst,stf,pln);
 %% Optimization
 
 pln.propOpt.quantityOpt = quantityOpt;
-resultGUI = matRad_fluenceOptimizationQuantities(dij,cst,pln);
+resultGUI = matRad_fluenceOptimization(dij,cst,pln);
 
 %% Add LET objective
 

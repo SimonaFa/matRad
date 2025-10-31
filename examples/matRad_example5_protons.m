@@ -28,7 +28,21 @@ matRad_rc; %If this throws an error, run it from the parent directory first to s
 % Let's begin with a clear Matlab environment and import the prostate
 % patient into your workspace
 
-load('PROSTATE.mat');
+load('BOXPHANTOM.mat');
+
+%% Set cst
+for i=1:size(cst,1)
+    if ~isempty(cst{i,6})
+        for objIdx = 1:length(cst{i,6})
+            cst{i,6}{objIdx}.robustness = 'none';
+            cst{i,6}{objIdx}.quantity   = 'RBExDose'; %RBExDose
+            %cst{i,5}.alphaX = RBEtable.meta.alphaX;
+            %cst{i,5}.betaX = RBEtable.meta.betaX;
+        end
+    end
+end
+
+%cst{2,6}{1}.parameters = {[60]};
 
 %% Treatment Plan
 % The next step is to define your treatment plan labeled as 'pln'. This 
@@ -43,8 +57,8 @@ load('PROSTATE.mat');
 % base data. matRad features generic base data in the file
 % 'proton_Generic.mat'; consequently the machine has to be set accordingly
 pln.radiationMode = 'protons';        
-pln.machine       = 'Generic';
-pln.bioModel      = 'constRBE';
+pln.machine       = 'Generic_RBE_clusterDose'; %Generic
+pln.bioModel      = 'MCN'; %constRBE
 pln.multScen      = 'nomScen';
 
 %%
@@ -52,14 +66,14 @@ pln.multScen      = 'nomScen';
 % alongside the physical dose. Therefore you need to activate the
 % corresponding option during dose calculcation. We also explicitly say to
 % use the Hong Pencil Beam Algorithm
-pln.propDoseCalc.calcLET = 0;
+pln.propDoseCalc.calcLET = 1;
 pln.propDoseCalc.engine = 'HongPB';
                                        
 %%
 % Now we have to set the remaining plan parameters.
 pln.numOfFractions        = 30;
-pln.propStf.gantryAngles  = [90 270];
-pln.propStf.couchAngles   = [0 0];
+pln.propStf.gantryAngles  = [-90];
+pln.propStf.couchAngles   = [0];
 pln.propStf.bixelWidth    = 5;
 pln.propStf.numOfBeams    = numel(pln.propStf.gantryAngles);
 pln.propStf.isoCenter     = ones(pln.propStf.numOfBeams,1) * matRad_getIsoCenter(cst,ct,0);
@@ -74,8 +88,12 @@ pln.propDoseCalc.doseGrid.resolution.z = 3; % [mm]
 % Optimization settings
 pln.propOpt.quantityOpt = 'RBExDose';
 
+
 %% Generate Beam Geometry STF
 stf = matRad_generateStf(ct,cst,pln);
+for i = 1:numel(stf)
+    stf(i).machine = pln.machine;
+end
 
 %% Dose Calculation
 % Lets generate dosimetric information by pre-computing dose influence 

@@ -35,8 +35,8 @@ classdef matRad_MCNamara < matRad_RBEminMax
 
         function [RBEmin, RBEmax] = getRBEminMax(this,bixel)
 
-            RBEmax     = this.p0_MCN + ((this.p1_MCN * bixel.LET )./ bixel.vABratio);
-            RBEmin     = this.p2_MCN + (this.p3_MCN  * sqrt(bixel.vABratio) .* bixel.LET);
+            RBEmax     = this.p0_MCN + ((this.p1_MCN .* bixel.LET )./ bixel.vABratio);
+            RBEmin     = this.p2_MCN + (this.p3_MCN  .* sqrt(bixel.vABratio) .* bixel.LET);
 
         end
 

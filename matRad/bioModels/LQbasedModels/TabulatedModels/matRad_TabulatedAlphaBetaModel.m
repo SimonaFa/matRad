@@ -101,6 +101,8 @@ classdef matRad_TabulatedAlphaBetaModel < matRad_TabulatedDoseAveragedKernelMode
                     matRad_cfg.dispError('Cannot find RBEtable: %s', fileName);
                 end
             end
+
+            RBEtable = RBEtable;
         end
 
     end

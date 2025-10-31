@@ -29,11 +29,17 @@ classdef (Abstract) matRad_DijDistributionQuantity < matRad_DistributionQuantity
 
             % Check that the field is present and not empty for the
             % required scenario
-            if ~isempty(dij.(this.dijField{1}){scen})
+            quantityName = this.dijField{1};
+
+            if strcmp(quantityName, 'clusterDose')
+                quantityName = 'mClusterDose';
+            end
+
+            if ~isempty(dij.(quantityName){scen})
         
                 % Compute the product
-                quantityOutput = dij.(this.dijField{1}){scen}*w;
-        
+                quantityOutput = dij.(quantityName){scen}*w;
+
             else
                 matRad_cfg = MatRad_Config.instance();
                 matRad_cfg.dispWarning('Empty scenario in optimization detected! This should not happen...\n');
