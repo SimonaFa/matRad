@@ -293,6 +293,26 @@ if isfield(dij,'mFluence') && isfield(dij, 'mClusterDose')
     end
 end
 
+%% Cluster Effectiveness
+
+if isfield(dij, 'mClusterDose') && isfield(resultGUI, 'averageIp') && isfield(resultGUI, 'clusterDose')
+    for i = 1:length(beamInfo)
+        clusterDoseCube = dij.mClusterDose{scenNum} * (resultGUI.w .* beamInfo(i).logIx);
+        fluenceCube = dij.mFluence{scenNum} * (resultGUI.w .* beamInfo(i).logIx);
+        averageIpCube = clusterDoseCube./fluenceCube;
+        averageIpCube(isnan(averageIpCube(:))) = 0;
+        highCDcubeBool = (clusterDoseCube(:) > 1.6e15);
+        highIPcubeBool = (averageIpCube(:) > 1e9);
+        maskVoxelBool = logical(highCDcubeBool .* highIPcubeBool);
+        RCE = 1 - 1./(1+exp(-0.05.*(averageIpCube(maskVoxelBool)-5e9)./1.2./5e7));
+        clusterDoseCube(maskVoxelBool) = RCE.*averageIpCube(maskVoxelBool).*fluenceCube(maskVoxelBool); 
+        resultGUI.(['effectiveClusters', beamInfo(i).suffix]) = zeros(dij.doseGrid.dimensions);
+        resultGUI.(['effectiveClusters', beamInfo(i).suffix]) = clusterDoseCube;
+        resultGUI.(['effectiveClusters', beamInfo(i).suffix]) = reshape(full(clusterDoseCube),dij.doseGrid.dimensions);
+        %effectiveClusters = 
+    end
+end
+
 
 %%
 % group similar fields together
