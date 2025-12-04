@@ -329,6 +329,7 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
                             X.cDoseWeight2 = baseData.Fluence.spectra(primaryIdx).tripleGauss.w2';
                             X.cDoseWeight3 = baseData.Fluence.spectra(primaryIdx).tripleGauss.w3';
                         else
+                            matRad_cfg =  MatRad_Config.instance();
                             matRad_cfg.dispWarning('Chosen Machine does not include a Fluence. Using absorbed dose lateral model instead.');
                             this.calcCDScatteringFromDose = 1;
                         end
@@ -337,7 +338,7 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
                 end
             end
 
-            if isfield(this.machine.meta, 'machine') && strcmp(this.machine.meta.machine, 'HIT')
+            if isfield(this.machine.meta, 'machine') && strcmp(this.machine.meta.machine, 'HIT') && isfield(X, 'clusterDose')
                 X.clusterDose = X.clusterDose';
             end
 
