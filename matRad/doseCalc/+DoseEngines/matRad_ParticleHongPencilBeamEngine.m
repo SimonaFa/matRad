@@ -200,6 +200,7 @@ classdef matRad_ParticleHongPencilBeamEngine < DoseEngines.matRad_ParticlePencil
                     if this.calcSecondary
                         bixel.mClusterDoseSecondary = clusterDoseSecondary;
                     end
+                    
                 else
 
                     if isfield(kernels, 'cDoseSigma1') && ~this.calcCDScatteringFromDose

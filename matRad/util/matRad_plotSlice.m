@@ -142,7 +142,7 @@ if ~isempty(p.Results.dose)
     if ~isempty(p.Results.doseWindow) && p.Results.doseWindow(2) - p.Results.doseWindow(1) <= 0
         doseWindow = p.Results.doseWindow;
     end        
-    [hDose,doseColorMap,doseWindow] = matRad_plotDoseSlice(p.Results.axesHandle, p.Results.dose, p.Results.plane, p.Results.slice, p.Results.thresh, p.Results.alpha, p.Results.doseColorMap, doseWindow);
+    [hDose,doseColorMap,doseWindow] = matRad_plotDoseSlice(p.Results.axesHandle, p.Results.dose, p.Results.plane, p.Results.slice, p.Results.thresh, p.Results.alpha, p.Results.doseColorMap, p.Results.doseWindow);
     hold on;
     
     %% Plot iso dose lines

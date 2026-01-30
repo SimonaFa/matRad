@@ -39,7 +39,7 @@ focusIxVec = tempFocus(uniqueEnergyIdx);
 [~,energyIxVec] = intersect([baseData.energy],energyVec);
 
 if length(energyVec)==1
-    sigmaIni = matRad_interp1(baseData(energyIxVec).initFocus.dist(rays.focusIx,:)',baseData(energyIxVec).initFocus.sigma(rays.focusIx,:)',SSD);
+    sigmaIni = matRad_interp1(baseData(energyIxVec).initFocus.dist(rays.focusIx,:)',baseData(energyIxVec).initFocus.sigma(rays.focusIx,:)',SSD,'extrap');
     
 else
     % finds standard deviation and distance for all the energies
