@@ -63,7 +63,9 @@ classdef matRad_TabulatedAlphaBetaModel < matRad_TabulatedDoseAveragedKernelMode
                 for i=1:numel(this.quantityTable.meta.alphaX)
                     if (this.quantityTable.meta.alphaX(i) == alphaX) && (this.quantityTable.meta.betaX(i) == betaX)
                         tableData = this.extractFragmentsWithZA([this.includedFragments.Z], [this.includedFragments.A], this.quantityTable.data);
-                         
+                        
+                        %tableData = tableData(~arrayfun(@(s) isempty(s.alpha), tableData));
+
                         for j=1:numel(tableData)
                             tableData(j).alpha = tableData(j).alpha(:,i);
                             tableData(j).beta  = tableData(j).beta(:,i);

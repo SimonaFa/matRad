@@ -1735,6 +1735,15 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
 
             matRad_cfg = MatRad_Config.instance();
 
+            Z = [this.bioModel.includedFragments.Z];
+            A = [this.bioModel.includedFragments.A];
+
+            idx = (Z == 1) & (A ~= 1);
+
+            if any(idx)
+                [this.bioModel.includedFragments(idx).A] = deal(1);
+            end
+            
             RBEtableData = this.bioModel.getTableDataForAlphaBeta(this.bioParameters.AlphaX, this.bioParameters.BetaX);
             includedIons = this.bioModel.includedFragments;
             
