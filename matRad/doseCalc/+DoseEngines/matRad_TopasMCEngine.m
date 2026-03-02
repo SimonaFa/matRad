@@ -974,13 +974,8 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
                             end
                         end
 
-%{
-<<<<<<< HEAD
-                        if ~isempty(strfind(lower(tnameFile),'dose')) || ~isempty(strfind(lower(tnameFile),'ionizationdetail'))
-=======
-%}
-                        if ~isempty(strfind(lower(tnameFile),'dose')) && (isempty(strfind(lower(tnameFile),'doseaveragedtabulatedalphabeta')))
-%>>>>>>> dev_quantities_RBE_tabModels_copyRemo
+
+                        if ~isempty(strfind(lower(tnameFile),'dose'))  || ~isempty(strfind(lower(tnameFile),'ionizationdetail')) && (isempty(strfind(lower(tnameFile),'doseaveragedtabulatedalphabeta')))
                             if obj.MCparam.nbRuns > 1
                                 % Calculate Standard Deviation from batches
                                 topasMeanDiff = zeros(cubeDim(1),cubeDim(2),cubeDim(3));
