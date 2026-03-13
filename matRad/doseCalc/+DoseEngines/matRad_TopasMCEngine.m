@@ -38,8 +38,18 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
         clusterDoseIP           
         clusterDoseK 
         scoreTOPAS_RBE
-        includeElectrons = 0;
-        MCTSdatabase = 2021;
+        includeElectrons        = 0;
+        MCTSdatabase            = 2021;
+
+        %other
+        averagingMethod         = true;
+        interpolateFrequencies  = true;
+        ionMinKineticEnergy     = 0;
+        electronMinKineticEnergy= 0;
+        protonsMinKineticEnergy = 0;
+        includeNeutrons         = false;
+        energyStepFromTrack     = false;
+        filterPrimariesSecondaries = false;
 
         topasExecCommand; %Defaults will be set during construction according to TOPAS installation instructions and used system
 
@@ -1371,6 +1381,75 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
                 fprintf(fID,'\n');
             else
                 error('Select a proper MCTS database version!');
+            end
+
+            % Other parameters
+            if obj.calcClusterDose
+            % Averaging method
+                if obj.averagingMethod
+                    fprintf(fID,'s:Sim/AverageMethod = "track"\n');
+                    fprintf(fID,'\n');
+                else
+                    fprintf(fID,'s:Sim/AverageMethod = "edep"\n');
+                    fprintf(fID,'\n');
+                end
+
+                % Interpolate method
+                if obj.interpolateFrequencies
+                    fprintf(fID,'b:Sim/interpBool = "True"\n');
+                    fprintf(fID,'\n');
+                else
+                    fprintf(fID,'b:Sim/interpBool = "False"\n');
+                    fprintf(fID,'\n');
+                end
+
+                % Energy filters
+                fprintf(fID,'d:Sim/ionMinKineticEnergy = %d\n', ionMinKineticEnergy);
+                fprintf(fID,'\n');
+
+                fprintf(fID,'d:Sim/electronMinKineticEnergy = %d\n', electronMinKineticEnergy);
+                fprintf(fID,'\n');
+                
+                fprintf(fID,'d:Sim/protonMinKineticEnergy = %d\n', protonsMinKineticEnergy);
+                fprintf(fID,'\n');
+                
+                % Include Neutrons
+                if obj.includeNeutrons
+                    fprintf(fID,'b:Sim/NeutronBool = "True"\n');
+                    fprintf(fID,'\n');
+                else
+                    fprintf(fID,'b:Sim/NeutronBool = "False"\n');
+                    fprintf(fID,'\n');
+                end
+
+                % PreStep and PostStep Energy
+                if obj.energyStepFromTrack
+                    fprintf(fID,'b:Sim/energyStepBool = "True"\n');
+                    fprintf(fID,'\n');
+                else
+                    fprintf(fID,'b:Sim/energyStepBool = "False"\n');
+                    fprintf(fID,'\n');
+                end
+
+                % Include Excitations
+                if obj.includeExcitation
+                    fprintf(fID,'b:Sim/excitationBool = "True"\n');
+                    fprintf(fID,'\n');
+                else
+                    fprintf(fID,'b:Sim/excitationBool = "False"\n');
+                    fprintf(fID,'\n');
+                end
+
+                % Filter by primaries and secondaries
+                if obj.filterPrimariesSecondaries
+                    fprintf(fID,'b:Sim/filterPrimSecBool = "True"\n');
+                    fprintf(fID,'\n');
+                else
+                    fprintf(fID,'b:Sim/filterPrimSecBool = "False"\n');
+                    fprintf(fID,'\n');
+                end
+
+
             end
 
             logicalString = {'"False"', '"True"'};
