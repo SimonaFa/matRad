@@ -102,10 +102,10 @@ for num = 1:length(spectraIdx)
     
     if strcmp(typeIP, 'F')
     fileNameMCTSbaseData    = ['C:\Users\s742o\Work\MCTS-DataBase-UCSF\v2024\v2024', ...
-                                '\', particleName, '_', 'IonizationDetail', '_IDF', '.dat'];
+                                '\', particleName, '_', 'IonizationDetail', '_Fk', '.dat'];
     elseif strcmp(typeIP, 'N')
         fileNameMCTSbaseData    = ['C:\Users\s742o\Work\MCTS-DataBase-UCSF\v2024\v2024', ...
-                                '\', particleName, '_', 'IonizationDetail', '_IDM', '.dat'];
+                                '\', particleName, '_', 'IonizationDetail', '_Nk', '.dat'];
     end
 
     % This could be substituted with directly reading from the already imported
