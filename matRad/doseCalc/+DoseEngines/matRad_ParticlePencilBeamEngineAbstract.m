@@ -33,7 +33,10 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
         calcCDScatteringFromDose    = false;
         includeElectrons            = false;
 
+        MCTSdatabase = 2025;
+
         calcFluence                 = false;
+        calcSquaredIp               = true;
 
         airOffsetCorrection  = true;    % Corrects WEPL for SSD difference to kernel database
         lateralModel = 'fast';          % Lateral Model used. 'auto' uses the most accurate model available (i.e. multiple Gaussians), 'fastest' uses the most simple model. 'single','double','multi' try to force a singleGaussian or doubleGaussian model, if available
@@ -313,12 +316,28 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
 
                 
                 if ~this.calcClusterDoseFromFluence % Calc Cluster Dose from precomputed kernel
-
-                    if this.includeElectrons
-                        X.clusterDose = baseData.clusterDose.([this.clusterDoseIP 'k'])(this.clusterDoseK).cDVector';
+                    
+                    if this.MCTSdatabase == 2024
+                        if this.includeElectrons
+                            X.clusterDose = baseData.clusterDose2024.([this.clusterDoseIP 'k'])(this.clusterDoseK).cDVector';
+                        else
+                            X.clusterDose = baseData.clusterDose2024.([this.clusterDoseIP 'k'])(this.clusterDoseK).cDVecNoEl';
+                        end
+                    elseif this.MCTSdatabase == 2025
+                        if this.includeElectrons
+                            X.clusterDose = baseData.clusterDose2025.([this.clusterDoseIP 'k'])(this.clusterDoseK).cDVector';
+                        else
+                            X.clusterDose = baseData.clusterDose2025.([this.clusterDoseIP 'k'])(this.clusterDoseK).cDVecNoEl';
+                        end
                     else
-                        X.clusterDose = baseData.clusterDose.([this.clusterDoseIP 'k'])(this.clusterDoseK).cDVecNoEl';
-                    end                        
+                        if this.includeElectrons
+                            X.clusterDose = baseData.clusterDose.([this.clusterDoseIP 'k'])(this.clusterDoseK).cDVector';
+                        else
+                            X.clusterDose = baseData.clusterDose.([this.clusterDoseIP 'k'])(this.clusterDoseK).cDVecNoEl';
+                        end
+                    end
+
+
                     X.clusterDose = conversionFactorCD.*X.clusterDose;
 
                     if ~this.calcCDScatteringFromDose
@@ -347,24 +366,49 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
 
             % Calculate cluster dose for single fragment and consider
             % fluence lateral model
+
             if this.calcClusterDose
-                if this.calcClusterDoseFromFluence
+                if this.calcClusterDoseFromFluence || this.calcSquaredIp
                     if isfield(baseData, 'Fluence')
+                        if ~this.includeElectrons
+                            if bixel.baseData.Fluence.spectra(end).Z == -1
+                                maxIdx = length(bixel.baseData.Fluence.spectra)-1;
+                            else
+                                maxIdx = length(bixel.baseData.Fluence.spectra);
+                            end
+                        else
+                            if bixel.baseData.Fluence.spectra(end).Z ~= -1
+                                matRad_cfg =  MatRad_Config.instance();
+                                matRad_cfg.dispWarning('Electron spectra not found.');
+                                this.includeElectrons = 0;
+                            else
+                                maxIdx = length(bixel.baseData.Fluence.spectra);
+                            end
+                        end
                         if isfield(baseData.Fluence.spectra, 'tripleGauss')
-                            for partIdx = 1:numel(baseData.Fluence.spectra)
+                            for partIdx = 1:maxIdx
                                 % Calc single particle cluster Dose
                                 if isnan(baseData.Fluence.spectra(partIdx).A)
-                                    tmpCD = matRad_calcTotalIPxFluenceInDepth( baseData, [this.clusterDoseIP num2str(this.clusterDoseK)], baseData.Fluence.spectra(partIdx).Z )';
+                                    tmpCD = matRad_calcTotalIPxFluenceInDepth( baseData, this.MCTSdatabase , [this.clusterDoseIP num2str(this.clusterDoseK)], baseData.Fluence.spectra(partIdx).Z )';
                                 else
-                                    tmpCD = matRad_calcTotalIPxFluenceInDepth( baseData, [this.clusterDoseIP num2str(this.clusterDoseK)], baseData.Fluence.spectra(partIdx).Z, baseData.Fluence.spectra(partIdx).A )';
+                                    tmpCD = matRad_calcTotalIPxFluenceInDepth( baseData, this.MCTSdatabase ,[this.clusterDoseIP num2str(this.clusterDoseK)], baseData.Fluence.spectra(partIdx).Z, baseData.Fluence.spectra(partIdx).A )';
                                 end
                                 X.clusterDoseParticles(partIdx).clusterDoseProfile = conversionFactorCD.* matRad_interp1(depths, tmpCD, bixel.radDepths);
-                                X.Fluence(partIdx).sigma1 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.sigma1', bixel.radDepths);
-                                X.Fluence(partIdx).sigma2 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.sigma2', bixel.radDepths);
-                                X.Fluence(partIdx).sigma3 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.sigma3', bixel.radDepths);
-                                X.Fluence(partIdx).w2 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.w2', bixel.radDepths);
-                                X.Fluence(partIdx).w3 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.w3', bixel.radDepths);
-                                X.Fluence(partIdx).cumFluence = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).fluenceDepth', bixel.radDepths);
+                                %if ~this.calcCDScatteringFromDose
+                                    X.Fluence(partIdx).sigma1 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.sigma1', bixel.radDepths);
+                                    X.Fluence(partIdx).sigma2 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.sigma2', bixel.radDepths);
+                                    X.Fluence(partIdx).sigma3 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.sigma3', bixel.radDepths);
+                                    X.Fluence(partIdx).w2 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.w2', bixel.radDepths);
+                                    X.Fluence(partIdx).w3 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.w3', bixel.radDepths);
+                                    X.Fluence(partIdx).cumFluence = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).fluenceDepth', bixel.radDepths);
+                                %else
+                                    %X.Fluence(partIdx).sigma1 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.sigma1', bixel.radDepths);
+                                    %X.Fluence(partIdx).sigma2 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.sigma2', bixel.radDepths);
+                                    %X.Fluence(partIdx).sigma3 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.sigma3', bixel.radDepths);
+                                    %X.Fluence(partIdx).w2 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.w2', bixel.radDepths);
+                                    %X.Fluence(partIdx).w3 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.w3', bixel.radDepths);
+                                    %X.Fluence(partIdx).cumFluence = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).fluenceDepth', bixel.radDepths);
+                                %end
                             end
                         end
                     else
@@ -373,6 +417,48 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
                     end
                 end
             end
+
+            %{
+            if this.calcSquaredIp
+                if isfield(baseData, 'Fluence') && ~(this.calcClusterDoseFromFluence)
+                    % Electrons 
+                    if ~this.includeElectrons
+                        if bixel.baseData.Fluence.spectra(end).Z == -1
+                            maxIdx = length(bixel.baseData.Fluence.spectra)-1;
+                        else
+                            maxIdx = length(bixel.baseData.Fluence.spectra);
+                        end
+                    else
+                        if bixel.baseData.Fluence.spectra(end).Z ~= -1
+                            matRad_cfg =  MatRad_Config.instance();
+                            matRad_cfg.dispWarning('Electron spectra not found.');
+                            this.includeElectrons = 0;
+                        else
+                            maxIdx = length(bixel.baseData.Fluence.spectra);
+                        end
+                    end
+                    if isfield(baseData.Fluence.spectra, 'tripleGauss')
+                        for partIdx = 1:maxIdx
+                            % Calc Single Particle cluster Dose
+                            if isnan(baseData.Fluence.spectra(partIdx).A)
+                                tmpCD = matRad_calcTotalIPxFluenceInDepth( baseData, this.MCTSdatabase , [this.clusterDoseIP num2str(this.clusterDoseK)], baseData.Fluence.spectra(partIdx).Z )';
+                            else
+                                tmpCD = matRad_calcTotalIPxFluenceInDepth( baseData, this.MCTSdatabase ,[this.clusterDoseIP num2str(this.clusterDoseK)], baseData.Fluence.spectra(partIdx).Z, baseData.Fluence.spectra(partIdx).A )';
+                            end
+                            X.clusterDoseParticles(partIdx).clusterDoseProfile = conversionFactorCD.* matRad_interp1(depths, tmpCD, bixel.radDepths);
+                            X.Fluence(partIdx).sigma1 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.sigma1', bixel.radDepths);
+                            X.Fluence(partIdx).sigma2 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.sigma2', bixel.radDepths);
+                            X.Fluence(partIdx).sigma3 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.sigma3', bixel.radDepths);
+                            X.Fluence(partIdx).w2 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.w2', bixel.radDepths);
+                            X.Fluence(partIdx).w3 = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).tripleGauss.w3', bixel.radDepths);
+                            X.Fluence(partIdx).cumFluence = matRad_interp1(depths, baseData.Fluence.spectra(partIdx).fluenceDepth', bixel.radDepths);
+                        end
+                else
+                    matRad_cfg =  MatRad_Config.instance();
+                    matRad_cfg.dispError(sprintf('Fluence data not found. I am not able to calculate the squared Ip'));
+                end
+            end
+            %}
 %{
 <<<<<<< HEAD
             % bioDose
@@ -790,6 +876,16 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
                 end
             end
 
+            if this.calcSquaredIp
+                if isfield(this.machine.data,'Fluence')
+                    dij = this.allocateSquaredIpContainer(dij);
+                else
+                    matRad_cfg = MatRad_Config.instance();
+                    matRad_cfg.dispWarning('Squared Ip will not be computed!');
+                    this.calcSquaredIp = false;
+                end
+            end
+
             if this.calcFluence
                 if isfield(this.machine.data,'Fluence')
                     dij = this.allocateFluenceContainer(dij);
@@ -934,6 +1030,25 @@ classdef (Abstract) matRad_ParticlePencilBeamEngineAbstract < DoseEngines.matRad
                 end
             else
                 matRad_cfg.dispWarning('Cluster Dose not available in the machine data. Cluster Dose will not be calculated.');
+            end
+
+        end
+
+        function dij = allocateSquaredIpContainer(this,dij)
+            % allocate space for container used in CD calculation
+
+            % get MatLab Config instance for displaying warings
+            matRad_cfg = MatRad_Config.instance();
+            if this.calcSquaredIp
+                dij = this.allocateQuantityMatrixContainers(dij,{'mSquaredIp'});
+                %if this.calcPrimary
+                %    dij = this.allocateQuantityMatrixContainers(dij,{'mClusterDosePrimary'});
+                %end
+                %if this.calcSecondary
+                %    dij = this.allocateQuantityMatrixContainers(dij,{'mClusterDoseSecondary'});
+                %end
+            else
+                matRad_cfg.dispWarning('Squared Ip will not be calculated.');
             end
 
         end

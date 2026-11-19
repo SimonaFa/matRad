@@ -293,6 +293,22 @@ if isfield(dij,'mFluence') && isfield(dij, 'mClusterDose')
     end
 end
 
+%% Squared Ip
+
+if isfield(dij,'mSquaredIp')
+    for i = 1:length(beamInfo)
+        squaredIpCube = dij.mSquaredIp{scenNum} * (resultGUI.w .* beamInfo(i).logIx);
+        resultGUI.(['squaredIp', beamInfo(i).suffix]) = zeros(dij.doseGrid.dimensions);
+        resultGUI.(['squaredIp', beamInfo(i).suffix]) = squaredIpCube;
+        resultGUI.(['squaredIp', beamInfo(i).suffix]) = reshape(full(squaredIpCube),dij.doseGrid.dimensions);
+        if isfield(dij,'mSquaredIp_Std')
+            squaredIpStdCube = dij.mSquaredIp_Std;
+            resultGUI.(['squaredIp', '_batchStd', beamInfo(i).suffix]) = sqrt(reshape(full(squaredIpStdCube{scenNum}.^2 * (resultGUI.w .* beamInfo(i).logIx)),dij.doseGrid.dimensions));
+            %resultGUI.([doseFields{j}, doseQuantities{k}, beamInfo(i).suffix])(isnan(resultGUI.([doseFields{j}, doseQuantities{k}, beamInfo(i).suffix]))) = 0;
+        end
+    end
+end
+
 %% Cluster Effectiveness
 
 if isfield(dij, 'mClusterDose') && isfield(resultGUI, 'averageIp') && isfield(resultGUI, 'clusterDose')

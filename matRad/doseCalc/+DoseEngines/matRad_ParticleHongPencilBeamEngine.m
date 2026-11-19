@@ -115,9 +115,6 @@ classdef matRad_ParticleHongPencilBeamEngine < DoseEngines.matRad_ParticlePencil
             if this.calcBioDose                               
                 % This updates the info in bixel adding the necessary
                 % quantities
-                if bixel.radDepths > 1200
-                    stop = 1;
-                end
                 bixel = this.bioModel.calcBiologicalQuantitiesForBixel(bixel,kernels);
 
                 if isa(this.bioModel, 'matRad_LQBasedModel')
@@ -131,7 +128,7 @@ classdef matRad_ParticleHongPencilBeamEngine < DoseEngines.matRad_ParticlePencil
             end  
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             if this.calcClusterDose
-                if (this.calcClusterDoseFromFluence || ~this.calcCDScatteringFromDose)
+                if (this.calcClusterDoseFromFluence || ~this.calcCDScatteringFromDose || this.calcSquaredIp)
                     if isfield(bixel.baseData.Fluence.spectra, 'sigma')
                         error('not implemented \n');
                     elseif isfield(bixel.baseData.Fluence.spectra, 'doubleGauss')
@@ -164,7 +161,7 @@ classdef matRad_ParticleHongPencilBeamEngine < DoseEngines.matRad_ParticlePencil
                 end
 
                 % Calc cluster dose From Fluence
-                if this.calcClusterDoseFromFluence
+                if this.calcClusterDoseFromFluence || this.calcSquaredIp
                     clusterDoseTotal = zeros(size(kernels.clusterDoseParticles(1).clusterDoseProfile));
                     if this.calcPrimary
                         clusterDosePrimary = zeros(size(kernels.clusterDoseParticles(1).clusterDoseProfile));
@@ -172,7 +169,28 @@ classdef matRad_ParticleHongPencilBeamEngine < DoseEngines.matRad_ParticlePencil
                     if this.calcSecondary
                         clusterDoseSecondary = zeros(size(kernels.clusterDoseParticles(1).clusterDoseProfile));
                     end
-                    for pIdx = 1:(length(bixel.baseData.Fluence.spectra)-1)
+
+                    if ~this.includeElectrons
+                        if bixel.baseData.Fluence.spectra(end).Z == -1
+                            maxIdx = length(bixel.baseData.Fluence.spectra)-1;
+                        else
+                            maxIdx = length(bixel.baseData.Fluence.spectra);
+                        end
+                    else
+                        if bixel.baseData.Fluence.spectra(end).Z ~= -1
+                            matRad_cfg =  MatRad_Config.instance();
+                            matRad_cfg.dispWarning('Electron spectra not found.');
+                            this.includeElectrons = 0;
+                        else
+                            maxIdx = length(bixel.baseData.Fluence.spectra);
+                        end
+                    end
+
+                    if this.calcSquaredIp
+                        squaredIpTotal = zeros(size(kernels.clusterDoseParticles(1).clusterDoseProfile));
+                    end
+
+                    for pIdx = 1:maxIdx
                         % Calc sigmas
                         sigmaParticle(pIdx).s1 = sqrt(kernels.Fluence(pIdx).sigma1.^2 + bixel.sigmaIniSq);
                         sigmaParticle(pIdx).s2 = sqrt(kernels.Fluence(pIdx).sigma2.^2 + bixel.sigmaIniSq);
@@ -182,7 +200,19 @@ classdef matRad_ParticleHongPencilBeamEngine < DoseEngines.matRad_ParticlePencil
                         LcD = this.tripleGaussRadial( sqrt(bixel.radialDist_sq), sigmaParticle(pIdx).s1, sigmaParticle(pIdx).s2, sigmaParticle(pIdx).s3, kernels.Fluence(pIdx).w2, kernels.Fluence(pIdx).w3 );
 
                         % calc Cluster Dose
-                        clusterDoseTotal = clusterDoseTotal + LcD .* kernels.clusterDoseParticles(pIdx).clusterDoseProfile;
+                        if ~this.calcCDScatteringFromDose
+                            clusterDoseTotal = clusterDoseTotal + bixel.baseData.LatCutOff.CompFac .* LcD .* kernels.clusterDoseParticles(pIdx).clusterDoseProfile;
+                        else
+                            clusterDoseTotal = clusterDoseTotal + bixel.baseData.LatCutOff.CompFac .* L .* kernels.clusterDoseParticles(pIdx).clusterDoseProfile;
+                        end
+
+                        % calc Squared Ip
+                        if this.calcSquaredIp
+                            tmp = kernels.clusterDoseParticles(pIdx).clusterDoseProfile.^2 ./ kernels.Fluence(pIdx).cumFluence;
+                            tmp(kernels.Fluence(pIdx).cumFluence == 0) = 0;
+                            squaredIpTotal = squaredIpTotal + bixel.baseData.LatCutOff.CompFac .* LcD .* tmp;
+                        end
+
                         if (this.calcPrimary || this.calcSecondary)
                             if (pIdx == partIdx) && this.calcPrimary % Primary
                                 clusterDosePrimary = LcD .* kernels.clusterDoseParticles(pIdx).clusterDoseProfile;
@@ -193,7 +223,7 @@ classdef matRad_ParticleHongPencilBeamEngine < DoseEngines.matRad_ParticlePencil
                     end
 
                     % Calc Total Cluster Dose
-                    bixel.mClusterDose          = clusterDoseTotal;
+                    bixel.mClusterDose              = clusterDoseTotal;
                     if this.calcPrimary
                         bixel.mClusterDosePrimary   = clusterDosePrimary;
                     end
@@ -201,6 +231,9 @@ classdef matRad_ParticleHongPencilBeamEngine < DoseEngines.matRad_ParticlePencil
                         bixel.mClusterDoseSecondary = clusterDoseSecondary;
                     end
                     
+                    if exist("squaredIpTotal", "var")
+                        bixel.mSquaredIp = squaredIpTotal;
+                    end
                 else
 
                     if isfield(kernels, 'cDoseSigma1') && ~this.calcCDScatteringFromDose

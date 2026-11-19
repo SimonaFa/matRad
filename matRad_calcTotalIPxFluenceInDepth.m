@@ -1,4 +1,4 @@
-function clusterDose = matRad_calcTotalIPxFluenceInDepth(singleData, nameIP, whichZ, whichA)
+function clusterDose = matRad_calcTotalIPxFluenceInDepth(singleData, MCTS, nameIP, whichZ, whichA)
 % This function computes the fluence weighted sum of the IP from the
 % fluence spectra of all particles in the machine. Includes all species
 % from primaries to secondaries.
@@ -27,6 +27,11 @@ k = str2num(nameIP(2:end));
 defZ = [1, 2, 3, 4, 5, 6, 7, 8, -1];
 defA = [1, 4, 7, 9, 11, 12, 14, 16, 1];
 
+% MCTS database
+if ~sum(MCTS==[2021, 2024, 2025])
+    error('Only 2021, 2024, 2025 allowed for MCTS database.');
+end
+
 %% [2] - Allocate Cluster Dose Container
 
 fluenceIP = zeros(size(depths));
@@ -36,9 +41,9 @@ end
 
 %% [3] - Loop over Particle Types
 
-if nargin == 2 % take all
+if nargin == 3 % take all
     spectraIdx = 1:size(singleData.Fluence.spectra, 2);
-elseif nargin == 3
+elseif nargin == 4
     Zs = [singleData.Fluence.spectra.Z];
     Ms = [singleData.Fluence.spectra.A];
     spectraIdx = [];
@@ -50,7 +55,7 @@ elseif nargin == 3
         %end
         spectraIdx = [spectraIdx, find(Zs == whichZ(choice))];
     end
-elseif nargin ==4
+elseif nargin ==5
     Zs = [singleData.Fluence.spectra.Z];
     Ms = [singleData.Fluence.spectra.A];
     spectraIdx = [];
@@ -75,6 +80,10 @@ for num = 1:length(spectraIdx)
     deltaEPN         = energyPerNucleon(2) - energyPerNucleon(1);
     containerIP      = zeros(size(energyPerNucleon));
 
+    if (energyPerNucleon(2)-energyPerNucleon(1)) ==1
+        primaryIdx = spectraIdx;
+    end
+
     % This will be enlarged for Carbon
     if singleData.Fluence.spectra(particleIdx).Z == 1
         particleName = 'Proton';
@@ -96,17 +105,28 @@ for num = 1:length(spectraIdx)
         particleName = 'Electron';
     end
     
-    %directoryMCTS           = 'C:\Users\s742o\Work\MCTS-DataBase-UCSF\MCTS-DataBase\MCTS-DataBase';
-    %fileNameMCTSbaseData    = ['C:\Users\s742o\Work\MCTS-DataBase-UCSF\MCTS-DataBase\MCTS-DataBase', ...
-    %                            '\', particleName, '_', 'IonizationDetail', '_', typeIP, 'k.dat'];
-    
-    if strcmp(typeIP, 'F')
-    fileNameMCTSbaseData    = ['C:\Users\s742o\Work\MCTS-DataBase-UCSF\v2024\v2024', ...
-                                '\', particleName, '_', 'IonizationDetail', '_Fk', '.dat'];
-    elseif strcmp(typeIP, 'N')
-        fileNameMCTSbaseData    = ['C:\Users\s742o\Work\MCTS-DataBase-UCSF\v2024\v2024', ...
-                                '\', particleName, '_', 'IonizationDetail', '_Nk', '.dat'];
+    if MCTS == 2021
+        %directoryMCTS           = 'C:\Users\s742o\Work\MCTS-DataBase-UCSF\MCTS-DataBase\MCTS-DataBase';
+        fileNameMCTSbaseData    = ['C:\Users\s742o\Work\MCTS-DataBase-UCSF\MCTS-DataBase\MCTS-DataBase', ...
+            '\', particleName, '_', 'IonizationDetail', '_', typeIP, 'k.dat'];
+    elseif MCTS == 2024
+        if strcmp(typeIP, 'F')
+            fileNameMCTSbaseData    = ['C:\Users\s742o\Work\MCTS-DataBase-UCSF\v2024\v2024', ...
+                '\', particleName, '_', 'IonizationDetail', '_Fk', '.dat'];
+        elseif strcmp(typeIP, 'N')
+            fileNameMCTSbaseData    = ['C:\Users\s742o\Work\MCTS-DataBase-UCSF\v2024\v2024', ...
+                '\', particleName, '_', 'IonizationDetail', '_Nk', '.dat'];
+        end
+    elseif MCTS == 2025
+        if strcmp(typeIP, 'F')
+            fileNameMCTSbaseData    = ['C:\Users\s742o\Work\MCTS-DataBase-UCSF\v2025\v2025', ...
+                '\', particleName, '_', 'IonizationDetail', '_IDF', '.dat'];
+        elseif strcmp(typeIP, 'N')
+            fileNameMCTSbaseData    = ['C:\Users\s742o\Work\MCTS-DataBase-UCSF\v2025\v2025', ...
+                '\', particleName, '_', 'IonizationDetail', '_IDM', '.dat'];
+        end
     end
+    
 
     % This could be substituted with directly reading from the already imported
     % IP table in .mat format.
@@ -114,9 +134,6 @@ for num = 1:length(spectraIdx)
 
     % Delicate phase: get the IP vector through interpolation
     for energyBinIdx = 1:length(energyPerNucleon)
-        if energyBinIdx == 201
-            trythis = 1;
-        end
         E1 = energyPerNucleon(energyBinIdx);
         E2 = energyPerNucleon(energyBinIdx) + deltaEPN;
 
@@ -147,6 +164,51 @@ for num = 1:length(spectraIdx)
                 end
                 IPComb      = [IP1; IPComb; IP2];
 
+                Z = singleData.Fluence.spectra(particleIdx).Z;
+
+                if energyComb(1)==0 && deltaEPN == 1
+                    w   = @(e) e.^1;%./(e.^0.1+1)+1;%./(e.^10+1);
+                    wIP = IPComb.*w(energyComb);
+                    wE  = w(energyComb);
+                    %wIP = wIP(2:end);
+                    %wE  = wE(2:end);
+                    delta0 = energyComb(end)-energyComb(2);
+                    numerator = 0;
+                    denominator = 0;
+                    for numEl = 1:length(wIP)-1
+                        numerator = numerator + (( wIP(numEl+1) + wIP(numEl) )/2)*( ( energyComb(numEl+1) - energyComb(numEl) )/delta0);
+                        denominator = denominator + (( wE(numEl+1) + wE(numEl) )/2)*( ( energyComb(numEl+1) - energyComb(numEl) )/delta0);
+                    end
+                    av = numerator/denominator;
+
+                elseif energyComb(1)==0
+                    w   = @(e) e.^1;%./(e.^0.1+1)+1;%./(e.^10+1);
+                    wIP = IPComb.*w(energyComb);
+                    wE  = w(energyComb);
+                    %wIP = wIP(2:end);
+                    %wE  = wE(2:end);
+                    delta0 = energyComb(end)-energyComb(2);
+                    numerator = 0;
+                    denominator = 0;
+                    for numEl = 1:length(wIP)-1
+                        numerator = numerator + (( wIP(numEl+1) + wIP(numEl) )/2)*( ( energyComb(numEl+1) - energyComb(numEl) )/delta0);
+                        denominator = denominator + (( wE(numEl+1) + wE(numEl) )/2)*( ( energyComb(numEl+1) - energyComb(numEl) )/delta0);
+                    end
+                    av = numerator/denominator; 
+                    %av  = trapz(energyComb, IPComb.*w(energyComb)) / trapz(energyComb,w(energyComb)); 
+                end
+                %{
+                elseif energyComb(1)==0
+                    energyComb2     = energyComb(2:end);
+                    IPComb2         = IPComb(2:end);
+                    delta0          = energyComb2(end) - energyComb2(1);
+                    
+                    av = 0;
+                    for numEl = 1:length(IPComb2)-1
+                        av  = av + ( (( IPComb2(numEl+1) + IPComb2(numEl) )/2)* ( energyComb2(numEl+1) - energyComb2(numEl) )/delta0 );
+                    end
+                %}
+
                 for numEl = 1:length(IPComb)-1
                     containerIP(energyBinIdx) = containerIP(energyBinIdx) + (( IPComb(numEl+1) + IPComb(numEl) )/2)*( ( energyComb(numEl+1) - energyComb(numEl) )/deltaEPN);
                 end
@@ -159,12 +221,28 @@ for num = 1:length(spectraIdx)
     %if (singleData.Fluence.spectra(particleIdx).Z == -1)
     %dataPhi(1,:) = zeros(size(singleData.Fluence.spectra(particleIdx).fluenceSpectrum(1,:)));
     %end
-    fluenceIP = fluenceIP + containerIP*dataPhi;
+
+    if exist("av") %&& Z ==1 %(energyPerNucleon(2)-energyPerNucleon(1)== 1) %spectraIdx == primaryIdx
+
+        newIPcont       = containerIP;
+        newIPcont(1)    = av;
+        fluenceIP       = fluenceIP + newIPcont * dataPhi;
+
+    else
+        fluenceIP       = fluenceIP + containerIP * dataPhi;
+    end
+
+    %fluenceIP = fluenceIP + containerIP*dataPhi;
 
 end
 % Conversion factor from dividing by L = 23.88nm = 23.88 10^-6 (mean chord
 % lenght) and rho = 1g/cm^3 = 10^-6 kg/mm^3 (water density).
-cf = 10^12/23.88;                % 10^9 becomes 10^7 if the normalization is for cm^2
+if MCTS==2025
+    cf = 10^12;%/23.88;                % 10^9 becomes 10^7 if the normalization is for cm^2
+else
+    cf = 10^12/23.88;
+end
+
 clusterDose = fluenceIP.*cf;     % CD units [mm^2/kg per primary]
 
 end

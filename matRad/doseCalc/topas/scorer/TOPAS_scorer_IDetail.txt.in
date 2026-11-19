@@ -4,9 +4,9 @@ s:Sc/Patient/Tally_ionizationDetail/OutputFile 			        = Sim/ScoreLabel + "_i
 s:Sc/Patient/Tally_ionizationDetail/AveragingMethod 		    = Sim/AverageMethod                 # default is "track"
 b:Sc/Patient/Tally_ionizationDetail/InterpolateFrequencies 	    = Sim/interpBool                    # default is "True"
 s:Sc/Patient/Tally_ionizationDetail/Component 			        = "Patient"
-d:Sc/Patient/Tally_ionizationDetail/IonMinKineticEnergy		    = Sim/ionMinKineticEnergy MeV       # default is 0.0 MeV
-d:Sc/Patient/Tally_ionizationDetail/ElectronMinKineticEnergy	= Sim/electronMinKineticEnergy eV   # default is 0.0 eV
-d:Sc/Patient/Tally_ionizationDetail/ProtonMinKineticEnergy	    = Sim/protonMinKineticEnergy eV     # default is 0.0 eV
+d:Sc/Patient/Tally_ionizationDetail/IonMinKineticEnergy		    = Sim/ionMinKineticEnergy * 1 MeV       # default is 0.0 MeV
+d:Sc/Patient/Tally_ionizationDetail/ElectronMinKineticEnergy	= Sim/electronMinKineticEnergy * 1 eV   # default is 0.0 eV
+d:Sc/Patient/Tally_ionizationDetail/ProtonMinKineticEnergy	    = Sim/protonMinKineticEnergy * 1 eV     # default is 0.0 eV
 s:Sc/Patient/Tally_ionizationDetail/DataBaseLocation		    = Sim/MCTSvFolder                   #"/home/s742o/TOPASplans/MCTS-DataBase"
 s:Sc/Patient/Tally_ionizationDetail/IfOutputFileAlreadyExists 	= "Overwrite" 	                    #"Exit","Overwrite" or "Increment"
 

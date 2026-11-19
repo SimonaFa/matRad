@@ -88,8 +88,8 @@ for i = 1:size(cst,1)
             
             if ~exist('fJacob', 'var') || ~isfield(fJacob,quantityConstrained)
                 if isa(quantityConstrainedInstance, 'matRad_DistributionQuantity')
-                    fJacob.(quantityConstrained) = cell(1);%cell(size(d.(quantityConstrained)));
-                    fJacob.(quantityConstrained) = {zeros(dij.doseGrid.numOfVoxels,1)};
+                    fJacob.(quantityConstrained) = cell(size(d.(quantityConstrained))); %cell(1);
+                    % fJacob.(quantityConstrained) = {zeros(dij.doseGrid.numOfVoxels,1)};
                 elseif isa(quantityConstrainedInstance, 'matRad_ScalarQuantity')
                     fJacob.(quantityConstrained)= cell(size(cst,1),1);
                     %fJacob.(quantityConstrained)(:) = {};           
@@ -176,7 +176,7 @@ for i = 1:size(cst,1)
             if isa(quantityConstrainedInstance, 'matRad_DistributionQuantity')
                 startIx = size(fJacob.(quantityConstrained){1},2) + 1;
 
-                fJacob.(quantityConstrained) = {[fJacob.(quantityConstrained){1},sparse(dij.doseGrid.numOfVoxels,nConst)]}; 
+                fJacob.(quantityConstrained) = {[fJacob.(quantityConstrained){1},sparse(dij.doseGrid.numOfVoxels,nConst)]}; %{[sparse(dij.doseGrid.numOfVoxels,nConst)]}; 
                 fJacob.(quantityConstrained){1}(cst{i,4}{1},startIx:end) = jacobSub;
             elseif isa(quantityConstrainedInstance, 'matRad_ScalarQuantity')
                 startIx = size(fJacob.(quantityConstrained){i},2) + 1;

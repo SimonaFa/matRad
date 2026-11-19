@@ -218,7 +218,9 @@ end
 if ~isempty(axesVarargin)
     index = cellfun(@(x) strcmp(x,'Title'), axesVarargin, 'UniformOutput', 1);
     index = find(index);
-    p.Results.axesHandle.Title.String = axesVarargin{index+1};
+    if ~isempty(index)
+        p.Results.axesHandle.Title.String = axesVarargin{index+1};
+    end
 end
 
 if ~exist('hCMap', 'var')

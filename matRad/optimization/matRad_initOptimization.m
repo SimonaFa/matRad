@@ -219,6 +219,7 @@ end
 % Easier if backprojection already knows about the optimized quantities and
 % so on
 wInit = backProjection.initializeWeights(cst,dij);
+wInit(isnan(wInit)) = 0;
 %% calculate probabilistic quantities for probabilistic optimization if at least
 % one robust objective is defined
 

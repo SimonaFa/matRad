@@ -301,8 +301,8 @@ if enable(2) == 1
     legend({'matRad','TOPAS'},'Location','southeast')
     legend boxoff
     
-    set(hfig.profiles.fig,'name',['Profiles:, x=',num2str(slicename{1}),'mm, y=',num2str(slicename{2}),'mm, z=',num2str(slicename{3}),'mm']);
-%{
+    %set(hfig.profiles.fig,'name',['Profiles:, x=',num2str(slicename{1}),'mm, y=',num2str(slicename{2}),'mm, z=',num2str(slicename{3}),'mm']);
+%
     hfig.profiles.x = subplot(2,2,1,colorSpec{:});
     profilePlot(hfig.profiles.x,posX,profilex{1},profilex{2},'x-Profiles','Dose 1','Dose 2', 'x [mm]','dose [Gy]',matRad_cfg.gui);
 

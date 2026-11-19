@@ -37,7 +37,7 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
         calcClusterDose        
         clusterDoseIP           
         clusterDoseK 
-        scoreTOPAS_RBE
+        scoreTOPAS_RBE          = false;
         includeElectrons        = 0;
         MCTSdatabase            = 2021;
 
@@ -50,6 +50,7 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
         includeNeutrons         = false;
         energyStepFromTrack     = false;
         filterPrimariesSecondaries = false;
+        includeExcitation       = false;
 
         topasExecCommand; %Defaults will be set during construction according to TOPAS installation instructions and used system
 
@@ -472,7 +473,10 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
 
             this.assignPropertiesFromPln@DoseEngines.matRad_DoseEngineBase(pln, warnWhenPropertyChanged);
 
-            this.scorer.RBE_model = {this.bioModel.model};
+            if isfield(pln.bioModel, 'model')
+                this.scorer.RBE_model = {this.bioModel.model};
+            end
+
 
         end
     end
@@ -957,7 +961,8 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
                             % l     = 23.88*10^-6mm
                             % rho   = 1g/cm3
                             % Vj    = resx*resy*resz = 9 mm3   
-                            conversionFactorClusterDose = 10^6./(23.88 * (obj.doseGrid.resolution.x) * (obj.doseGrid.resolution.y) * (obj.doseGrid.resolution.z));
+                            %conversionFactorClusterDose = 10^6./(23.88 * (obj.doseGrid.resolution.x) * (obj.doseGrid.resolution.y) * (obj.doseGrid.resolution.z));
+                            conversionFactorClusterDose = 10^6./( (obj.doseGrid.resolution.x) * (obj.doseGrid.resolution.y) * (obj.doseGrid.resolution.z));
                             if contains(genFileName, 'ionizationDetail') && isprop(obj, 'clusterDoseK')
                                 tmp = dataRead{obj.clusterDoseK} .* conversionFactorClusterDose;
                                 dataRead = [];
@@ -1379,6 +1384,9 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
             elseif obj.MCTSdatabase == 2024
                 fprintf(fID,'s:Sim/MCTSvFolder = "/home/s742o/MCTS-Database-v2024"\n');
                 fprintf(fID,'\n');
+            elseif obj.MCTSdatabase == 2025
+                fprintf(fID,'s:Sim/MCTSvFolder = "/home/s742o/MCTS-Database-v2025"\n');
+                fprintf(fID,'\n');
             else
                 error('Select a proper MCTS database version!');
             end
@@ -1404,13 +1412,13 @@ classdef matRad_TopasMCEngine < DoseEngines.matRad_MonteCarloEngineAbstract
                 end
 
                 % Energy filters
-                fprintf(fID,'d:Sim/ionMinKineticEnergy = %d\n', ionMinKineticEnergy);
+                fprintf(fID,'u:Sim/ionMinKineticEnergy = %d\n', obj.ionMinKineticEnergy);
                 fprintf(fID,'\n');
 
-                fprintf(fID,'d:Sim/electronMinKineticEnergy = %d\n', electronMinKineticEnergy);
+                fprintf(fID,'u:Sim/electronMinKineticEnergy = %d\n', obj.electronMinKineticEnergy);
                 fprintf(fID,'\n');
                 
-                fprintf(fID,'d:Sim/protonMinKineticEnergy = %d\n', protonsMinKineticEnergy);
+                fprintf(fID,'u:Sim/protonMinKineticEnergy = %d\n', obj.protonsMinKineticEnergy);
                 fprintf(fID,'\n');
                 
                 % Include Neutrons
